@@ -1328,6 +1328,78 @@ attachNotifOutsideClose();
 }
 }
 
+// ── REACTION NOTIFICATIONS ──────────────────────────
+function sendReactionNotification(itemId, reactionData) {
+if (!currentUser) return;
+// Find the author of this item
+var authorEmail = null;
+allComments.forEach(function(c) {
+if (c.id === itemId) authorEmail = c.email;
+(c.replies || []).forEach(function(r) {
+if (r.id === itemId) authorEmail = r.email;
+});
+});
+if (!authorEmail || authorEmail === currentUser.email) return; // don’t notify self
+if (authorEmail === MODERATOR_EMAIL && currentUser.email !== MODERATOR_EMAIL) {
+// notify mod too
+}
+
+```
+// Collect all unique reactors across all emojis
+var reactors = {};
+Object.keys(reactionData).forEach(function(emoji) {
+  (reactionData[emoji] || []).forEach(function(email) {
+    if (email !== authorEmail) reactors[email] = true;
+  });
+});
+var reactorEmails = Object.keys(reactors);
+if (reactorEmails.length === 0) return;
+
+var notifKey = NOTIF_KEY + ':' + authorEmail;
+var notifs = [];
+try { notifs = JSON.parse(localStorage.getItem(notifKey) || '[]'); } catch(e) {}
+
+// Find existing reaction notification for this item
+var existingIdx = -1;
+notifs.forEach(function(n, i) {
+  if (n.type === 'reaction' && n.itemId === itemId) existingIdx = i;
+});
+
+var count = reactorEmails.length;
+var reactorName = usernameMap[currentUser.email] || currentUser.name || 'Someone';
+var preview;
+if (count === 1) {
+  preview = reactorName + ' reacted to your comment';
+} else {
+  preview = count + ' users reacted to your comment';
+}
+
+var notif = {
+  id: existingIdx !== -1 ? notifs[existingIdx].id : 'reaction_' + itemId,
+  type: 'reaction',
+  itemId: itemId,
+  read: false,
+  fromName: reactorName,
+  preview: '&#x1F525; ' + preview,
+  time: new Date().toISOString(),
+  pageUrl: window.location.pathname
+};
+
+if (existingIdx !== -1) {
+  notifs[existingIdx] = notif; // update existing
+} else {
+  notifs.unshift(notif); // add new
+}
+
+try { localStorage.setItem(notifKey, JSON.stringify(notifs)); } catch(e) {}
+// If this is the current user's own notification, refresh bell
+if (currentUser && authorEmail === currentUser.email) {
+  loadNotifications(); renderNotifBell();
+}
+```
+
+}
+
 function showNotifBell() {
 var bell = document.getElementById(‘notif-bell’);
 if (!bell) return;
@@ -1577,6 +1649,14 @@ localStorage.setItem(‘airdriftUsernameAttempts’, JSON.stringify(attempts));
 return;
 }
 if (!currentUser) return;
+// Check uniqueness – no two users can share a username
+var errorEl2 = document.getElementById(‘username-error’);
+var lowerName = name.toLowerCase();
+var isTaken = Object.keys(usernameMap).some(function(k) {
+return !k.endsWith(’_seen’) && k !== currentUser.email &&
+usernameMap[k].toLowerCase() === lowerName;
+});
+if (isTaken) { if (errorEl2) errorEl2.textContent = ‘That username is already taken.’; return; }
 usernameMap[currentUser.email] = name;
 usernameMap[currentUser.email + ‘_seen’] = true;
 currentUser.name = name;
@@ -3910,7 +3990,8 @@ var html = '<div class="reply-item ' + depthClass + (PRIORITY_TIERS.indexOf(getU
     (rIsOwner && rCanEdit ? '<button class="action-btn" data-id="' + reply.id + '" data-comment-id="' + commentId + '" onclick="startEditReply(this)">✏️ Edit</button>' : '') +
     (rIsOwner ? '<button class="action-btn" style="color:#ff4444;" data-id="' + reply.id + '" data-comment-id="' + commentId + '" onclick="deleteReply(this)">🗑 Delete</button>' : '') +
     (!rIsOwner ? '<button class="action-btn" data-id="' + reply.id + '" data-email="' + reply.email + '" onclick="reportComment(this)">&#x1F6A9; Report</button>' : '') +
-    (currentUser && currentUser.email === MODERATOR_EMAIL ? '<button class="highlight-btn' + (reply.highlighted ? ' highlighted' : '') + '" data-id="' + reply.id + '" data-comment-id="' + commentId + '" onclick="toggleHighlightReply(this)" title="Highlight reply">&#x2605;</button>' : '') +
+    renderReactionsBar(reply.id) +
+      (currentUser && currentUser.email === MODERATOR_EMAIL ? '<button class="highlight-btn' + (reply.highlighted ? ' highlighted' : '') + '" data-id="' + reply.id + '" data-comment-id="' + commentId + '" onclick="toggleHighlightReply(this)" title="Highlight reply">&#x2605;</button>' : '') +
   '</div>' : '') +
   '<div class="reply-form" id="reply-form-' + inputKey + '">' +
     '<textarea class="reply-textarea" id="reply-input-' + inputKey + '" placeholder="Write a reply..." maxlength="2000"></textarea>' +
@@ -4584,7 +4665,15 @@ var body =
 ‘<button onclick="confirmReport()" style="background:linear-gradient(135deg,#c03030,#8b1010);color:white;border:none;padding:8px 22px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Yes, Report</button>’ +
 ‘<button onclick="document.getElementById(\'announce-modal\').remove();_pendingReport=null;" style="background:none;border:1px solid #333;color:#888;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;">Nevermind</button>’ +
 ‘</div>’;
-showAnnouncement(‘File a Report?’, body, ‘🚩’);
+// Use a custom modal without an OK button – Yes/Nevermind are the only actions
+var existing = document.getElementById(‘announce-modal’);
+if (existing) existing.remove();
+var div = document.createElement(‘div’);
+div.id = ‘announce-modal’;
+div.style.cssText = ‘position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;’;
+div.innerHTML = ‘<div style="background:#111;border:1px solid #2a5f7f;border-radius:12px;padding:28px 28px 22px;max-width:380px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.8);"><div style="font-size:32px;margin-bottom:12px;">🚩</div><div style="font-size:16px;font-weight:700;color:#b89f37;margin-bottom:10px;">File a Report?</div>’ + body + ‘</div>’;
+div.addEventListener(‘click’, function(e) { if (e.target === div) { div.remove(); _pendingReport = null; } });
+document.body.appendChild(div);
 }
 
 function confirmReport() {
@@ -5909,25 +5998,34 @@ try { localStorage.setItem(‘airdriftReactions:’ + itemId, JSON.stringify(dat
 }
 
 function renderReactionsBar(itemId) {
-var data    = getReactions(itemId);
-var myEmail = currentUser ? currentUser.email : null;
-var tier    = myEmail ? getUserTier(myEmail) : null;
-var canReact= myEmail && (myEmail === MODERATOR_EMAIL || (tier && REACTION_TIERS.indexOf(tier) !== -1));
-var pills   = ‘’;
+var data      = getReactions(itemId);
+var myEmail   = currentUser ? currentUser.email : null;
+var tier      = myEmail ? getUserTier(myEmail) : null;
+var canReact  = myEmail && (myEmail === MODERATOR_EMAIL || (tier && REACTION_TIERS.indexOf(tier) !== -1));
+var isSignedOut  = !myEmail;
+// Click action for locked users – prompt sign-in or upgrade
+var lockedAction = isSignedOut
+? ‘showSignInModal('Sign in to react to comments.')’
+: ‘showUpgradeModal('Reactions require a Supporter flair or above.')’;
+var pills = ‘’;
 REACTIONS_AVAILABLE.forEach(function(emoji) {
 var users = data[emoji] || [];
 if (users.length === 0) return;
 var reacted = myEmail && users.indexOf(myEmail) !== -1;
+if (canReact) {
 pills += ‘<button class=“reaction-btn’ + (reacted ? ’ reacted’ : ‘’) + ‘”’ +
-’ onclick=“toggleReaction('’ + itemId + ‘','’ + emoji + ‘')”’ +
-(canReact ? ‘’ : ’ disabled style=“cursor:default;”’) + ‘>’ +
-emoji + ’ <span class="reaction-count">’ + users.length + ‘</span>’ +
-‘</button>’;
+’ onclick=“toggleReaction('’ + itemId + ‘','’ + emoji + ‘')”>’ +
+emoji + ’ <span class="reaction-count">’ + users.length + ‘</span></button>’;
+} else {
+pills += ‘<button class="reaction-btn" onclick="' + lockedAction + '" style="opacity:0.6;">’ +
+emoji + ’ <span class="reaction-count">’ + users.length + ‘</span></button>’;
+}
 });
+// Always show + button — locked users get prompted to sign in or upgrade
 var addBtn = canReact
 ? ‘<button class="reaction-add-btn" onclick="showReactionPicker(this,\'' + itemId + '\')" title="React">+</button>’
-: ‘’;
-if (!pills && !addBtn) return ‘’;
+: ‘<button class="reaction-add-btn" onclick="' + lockedAction + '" style="opacity:0.5;" title="React">+</button>’;
+if (!pills && !canReact) return addBtn;
 return ‘<span class="reactions-inline" data-item-id="' + itemId + '">’ + pills + addBtn + ‘</span>’;
 }
 
@@ -5959,6 +6057,8 @@ setTimeout(function() { btn.classList.remove(‘pulsing’); }, 600);
 }
 });
 }, 10);
+// Send reaction notification to comment/reply author
+sendReactionNotification(itemId, data);
 }
 
 function showReactionPicker(btn, itemId) {

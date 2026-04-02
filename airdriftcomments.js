@@ -1,5 +1,6 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
+// Build: 2026-04-02 16:19
 
 var allComments  = [];
 var currentUser  = null;

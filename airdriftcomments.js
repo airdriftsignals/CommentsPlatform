@@ -1,6 +1,6 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-02 16:19
+// Build: 2026-04-02 16:36
 
 var allComments  = [];
 var currentUser  = null;
@@ -4663,13 +4663,13 @@ var body =
 ‘<div style="font-size:13px;color:#aaa;margin-bottom:20px;">This will flag the comment for moderator review.</div>’ +
 ‘<div style="display:flex;gap:10px;justify-content:center;">’ +
 ‘<button onclick="confirmReport()" style="background:linear-gradient(135deg,#c03030,#8b1010);color:white;border:none;padding:8px 22px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Yes, Report</button>’ +
-‘<button onclick="document.getElementById(\'announce-modal\').remove();_pendingReport=null;" style="background:none;border:1px solid #333;color:#888;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;">Nevermind</button>’ +
+‘<button onclick="document.getElementById(\'report-confirm-modal\').remove();_pendingReport=null;" style="background:none;border:1px solid #333;color:#888;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;">Nevermind</button>’ +
 ‘</div>’;
 // Use a custom modal without an OK button – Yes/Nevermind are the only actions
-var existing = document.getElementById(‘announce-modal’);
+var existing = document.getElementById(‘report-confirm-modal’);
 if (existing) existing.remove();
 var div = document.createElement(‘div’);
-div.id = ‘announce-modal’;
+div.id = ‘report-confirm-modal’;
 div.style.cssText = ‘position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;’;
 div.innerHTML = ‘<div style="background:#111;border:1px solid #2a5f7f;border-radius:12px;padding:28px 28px 22px;max-width:380px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.8);"><div style="font-size:32px;margin-bottom:12px;">🚩</div><div style="font-size:16px;font-weight:700;color:#b89f37;margin-bottom:10px;">File a Report?</div>’ + body + ‘</div>’;
 div.addEventListener(‘click’, function(e) { if (e.target === div) { div.remove(); _pendingReport = null; } });
@@ -4677,7 +4677,7 @@ document.body.appendChild(div);
 }
 
 function confirmReport() {
-var existing = document.getElementById(‘announce-modal’);
+var existing = document.getElementById(‘report-confirm-modal’);
 if (existing) existing.remove();
 if (!_pendingReport) return;
 var r = _pendingReport;

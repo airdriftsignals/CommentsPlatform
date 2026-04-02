@@ -31,7 +31,8 @@ var FLAIRS_KEY      = ‘airdriftFlairs’;
 var FLAIRS_PAGE_KEY = ‘airdriftFlairs:’ + window.location.pathname;
 var flairData       = {};
 var flairPageData   = {};
-var FLAIR_CODES = {
+// FLAIR_CODES is defined in the Blogger config block — not hardcoded here
+var FLAIR_CODES = window.FLAIR_CODES || {
 supporter:  ‘CODE_SUPPORTER’,
 subscriber: ‘CODE_SUBSCRIBER’,
 newcomer:   ‘CODE_DRIFTER’,

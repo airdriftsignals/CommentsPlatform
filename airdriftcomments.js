@@ -6381,172 +6381,167 @@ var cmd    = sel.value;
 var tierEl = document.getElementById(‘flair-admin-tier’);
 var scopeEl= document.getElementById(‘flair-admin-scope’);
 var typeEl = document.getElementById(‘flair-admin-type’);
-var wrap   = document.getElementById(‘cmd-args-wrap’);
-var fields = document.getElementById(‘cmd-args-fields’);
 var subBtn = document.getElementById(‘cmd-submit-btn’);
 var canBtn = document.getElementById(‘cmd-cancel-btn’);
 var ta     = document.getElementById(‘flair-admin-email’);
 
 ```
-// Hide everything first
+// Hide assign-flair-specific dropdowns
 [tierEl, scopeEl, typeEl].forEach(function(el) { if (el) el.style.display = 'none'; });
-wrap.style.display = 'none';
 subBtn.style.display = 'none';
 canBtn.style.display = 'none';
-fields.innerHTML = '';
-if (!cmd) return;
+
+// Remove any previously built arg fields
+var existing = document.getElementById('cmd-dynamic-fields');
+if (existing) existing.remove();
+
+if (!cmd) {
+  if (ta) ta.placeholder = 'Username, email, or arguments...';
+  return;
+}
 
 if (cmd === 'AssignFlair') {
-  // Show flair dropdowns -- Assign button is Submit
   if (tierEl)  tierEl.style.display  = 'inline-block';
   if (scopeEl) scopeEl.style.display = 'inline-block';
   subBtn.textContent = 'Assign';
   subBtn.style.display = 'inline-block';
   canBtn.style.display = 'inline-block';
   if (ta) ta.placeholder = 'Username or email...';
-} else {
-  // Show argument input fields
-  var def = CMD_DEFS[cmd];
-  if (ta) {
-    if (def && def.tierSelect) {
-      ta.placeholder = 'Optional: type full command here instead';
-    } else if (def && def.args.length) {
-      ta.placeholder = def.args.join(', ') + '...';
-    } else {
-      ta.placeholder = 'No arguments needed';
-    }
-  }
-  if (def && def.tierSelect) {
-    // Commands with a flair tier dropdown followed by their argument inputs
-    if (!fields || !wrap) { console.warn('cmd-args-fields or cmd-args-wrap not found'); return; }
-    var tierDropdown = document.createElement('select');
-    tierDropdown.className = 'flair-admin-select';
-    tierDropdown.setAttribute('data-role', 'tier-select');
-    var tierOpts = [
-      {val:'newcomer',  label:'Drifter'},
-      {val:'supporter', label:'Supporter'},
-      {val:'subscriber',label:'Subscriber'},
-      {val:'member',    label:'Member'},
-      {val:'collector', label:'Collector'},
-      {val:'artist',    label:'Featured Artist'},
-      {val:'writer',    label:'Featured Writer'},
-    ];
-    var defOpt = document.createElement('option');
-    defOpt.value = ''; defOpt.textContent = '-- Flair --';
-    tierDropdown.appendChild(defOpt);
-    tierOpts.forEach(function(t) {
-      var o = document.createElement('option');
-      o.value = t.val; o.textContent = t.label;
-      tierDropdown.appendChild(o);
-    });
-    fields.appendChild(tierDropdown);
-    // Add input fields for each arg after the tier dropdown
-    def.args.forEach(function(placeholder, idx) {
-      var inp = document.createElement('input');
-      inp.type = 'text';
-      inp.placeholder = placeholder;
-      inp.className = 'flair-admin-input';
-      inp.style.cssText = 'width:160px;display:inline-block;';
-      inp.setAttribute('data-idx', idx);
-      inp.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          var next = fields.querySelector('[data-idx="' + (idx + 1) + '"]');
-          if (next) next.focus(); else cmdSubmit();
-        } else if (e.key === 'Enter') { cmdSubmit(); }
-      });
-      fields.appendChild(inp);
-    });
-    // Show wrap before focusing so elements are measurable
-    wrap.style.display = 'block';
-    fields.style.display = 'flex';
-    setTimeout(function() {
-      var first = fields.querySelector('input');
-      if (first) first.focus(); else tierDropdown.focus();
-    }, 50);
-  } else if (def && def.args.length > 0) {
-    def.args.forEach(function(placeholder, idx) {
-      var inp = document.createElement('input');
-      inp.type = 'text';
-      inp.placeholder = placeholder;
-      inp.className = 'flair-admin-input';
-      inp.style.cssText = 'width:140px;display:inline-block;';
-      inp.setAttribute('data-idx', idx);
-      inp.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab' || e.key === ',') {
-          e.preventDefault();
-          var next = fields.querySelector('[data-idx="' + (idx + 1) + '"]');
-          if (next) next.focus();
-          else cmdSubmit();
-        } else if (e.key === 'Enter') {
-          cmdSubmit();
-        }
-      });
-      fields.appendChild(inp);
-    });
-    wrap.style.display = 'block';
-    fields.style.display = 'flex';
-    setTimeout(function() { var f = fields.querySelector('input'); if (f) f.focus(); }, 50);
-  } else if (def && def.optional) {
-    // No required args -- textarea is optional filter. Show a hint.
-    if (ta) ta.placeholder = 'Username or email (optional -- leave blank for all)';
-  }
-  subBtn.textContent = 'Submit';
-  subBtn.style.display = 'inline-block';
-  canBtn.style.display = 'inline-block';
+  return;
 }
+
+var def = CMD_DEFS[cmd];
+if (!def) return;
+
+// Build a fresh container and insert it into the command row
+var container = document.createElement('div');
+container.id = 'cmd-dynamic-fields';
+container.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;width:100%;';
+
+if (def.tierSelect) {
+  // Flair tier dropdown
+  var tierDrop = document.createElement('select');
+  tierDrop.className = 'flair-admin-select';
+  tierDrop.setAttribute('data-role', 'tier-select');
+  tierDrop.style.cssText = 'display:inline-block;';
+  [
+    {val:'', label:'-- Flair --'},
+    {val:'newcomer',  label:'Drifter'},
+    {val:'supporter', label:'Supporter'},
+    {val:'subscriber',label:'Subscriber'},
+    {val:'member',    label:'Member'},
+    {val:'collector', label:'Collector'},
+    {val:'artist',    label:'Featured Artist'},
+    {val:'writer',    label:'Featured Writer'},
+  ].forEach(function(t) {
+    var o = document.createElement('option');
+    o.value = t.val; o.textContent = t.label;
+    tierDrop.appendChild(o);
+  });
+  container.appendChild(tierDrop);
+}
+
+// Arg input fields
+def.args.forEach(function(placeholder, idx) {
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.placeholder = placeholder;
+  inp.className = 'flair-admin-input';
+  inp.style.cssText = 'width:160px;display:inline-block;';
+  inp.setAttribute('data-arg-idx', idx);
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      var next = container.querySelector('[data-arg-idx="' + (idx + 1) + '"]');
+      if (next) next.focus(); else cmdSubmit();
+    } else if (e.key === 'Enter') { cmdSubmit(); }
+  });
+  container.appendChild(inp);
+});
+
+if (def.optional) {
+  if (ta) ta.placeholder = 'Username or email (optional, leave blank for all)';
+} else if (ta) {
+  ta.placeholder = 'Or type full command here instead...';
+}
+
+// Insert container after the cmd-select row div
+var cmdRow = sel.closest ? sel.closest('div') : sel.parentNode;
+if (cmdRow) {
+  cmdRow.appendChild(container);
+}
+
+subBtn.textContent = 'Submit';
+subBtn.style.display = 'inline-block';
+canBtn.style.display = 'inline-block';
+
+// Focus first input or tier dropdown
+setTimeout(function() {
+  var first = container.querySelector('input');
+  if (first) first.focus();
+  else {
+    var drop = container.querySelector('select');
+    if (drop) drop.focus();
+  }
+}, 50);
 ```
 
 }
 
+```
 function cmdSubmit() {
-var sel = document.getElementById(‘cmd-select’);
+var sel = document.getElementById('cmd-select');
 var cmd = sel.value;
 if (!cmd) return;
-if (cmd === ‘AssignFlair’) {
-adminAssignFlair();
+if (cmd === 'AssignFlair') {
+  adminAssignFlair();
 } else {
-var def    = CMD_DEFS[cmd];
-var ta     = document.getElementById(‘flair-admin-email’);
-var fields = document.getElementById(‘cmd-args-fields’);
-var raw;
-if (def && def.optional) {
-// ViewUsers / BannedUsers – textarea is an optional filter
-var filter = ta ? ta.value.trim() : ‘’;
-raw = filter ? cmd + ‘(’ + filter + ‘)’ : cmd + ‘()’;
-} else {
-var args = [];
-// Read tier dropdown if present
-var tierSel = fields.querySelector(’[data-role=“tier-select”]’);
-if (tierSel) args.push(tierSel.value);
-fields.querySelectorAll(‘input’).forEach(function(inp) { args.push(inp.value.trim()); });
-// If arg fields are gone or empty, try parsing the textarea directly
-// Allows typing args comma-separated without parentheses
-var taVal = ta ? ta.value.trim() : ‘’;
-if (args.every(function(a){return a===’’;}) && taVal) {
-// Check if user already typed Cmd(args) format – pass through as-is
-var alreadyFormatted = new RegExp(’^’ + cmd + ‘\s*\(’, ‘i’).test(taVal);
-if (alreadyFormatted) {
-raw = taVal;
-} else {
-args = taVal.split(’,’).map(function(s){ return s.trim(); });
-raw = cmd + ‘(’ + args.join(’, ‘) + ‘)’;
+  var def    = CMD_DEFS[cmd];
+  var ta     = document.getElementById('flair-admin-email');
+  var fields = document.getElementById('cmd-args-fields');
+  var raw;
+  if (def && def.optional) {
+    // ViewUsers / BannedUsers -- textarea is an optional filter
+    var filter = ta ? ta.value.trim() : '';
+    raw = filter ? cmd + '(' + filter + ')' : cmd + '()';
+  } else {
+    var args = [];
+    // Read from dynamic fields container
+    var dynFields = document.getElementById('cmd-dynamic-fields');
+    if (dynFields) {
+      var tierSel = dynFields.querySelector('[data-role="tier-select"]');
+      if (tierSel) args.push(tierSel.value);
+      dynFields.querySelectorAll('input').forEach(function(inp) { args.push(inp.value.trim()); });
+    }
+    // If arg fields are gone or empty, try parsing the textarea directly
+    // Allows typing args comma-separated without parentheses
+    var taVal = ta ? ta.value.trim() : '';
+    if (args.every(function(a){return a==='';}) && taVal) {
+      // Check if user already typed Cmd(args) format -- pass through as-is
+      var alreadyFormatted = new RegExp('^' + cmd + '\\s*\\(', 'i').test(taVal);
+      if (alreadyFormatted) {
+        raw = taVal;
+      } else {
+        args = taVal.split(',').map(function(s){ return s.trim(); });
+        raw = cmd + '(' + args.join(', ') + ')';
+      }
+    } else {
+      raw = cmd + '(' + args.join(', ') + ')';
+    }
+  }
+  if (ta) ta.value = raw;
+  adminAssignFlair();
+  // Only clear fields on success
+  setTimeout(function() {
+    var st = document.getElementById('cmd-status');
+    var adSt = document.getElementById('flair-admin-status');
+    var hasErr = (st && st.textContent.indexOf('Error') !== -1) ||
+                 (adSt && adSt.textContent.indexOf('Error') !== -1);
+    if (!hasErr && fields) fields.innerHTML = '';
+  }, 250);
 }
-} else {
-raw = cmd + ‘(’ + args.join(’, ’) + ‘)’;
-}
-}
-if (ta) ta.value = raw;
-adminAssignFlair();
-// Only clear fields on success
-setTimeout(function() {
-var st = document.getElementById(‘cmd-status’);
-var adSt = document.getElementById(‘flair-admin-status’);
-var hasErr = (st && st.textContent.indexOf(‘Error’) !== -1) ||
-(adSt && adSt.textContent.indexOf(‘Error’) !== -1);
-if (!hasErr && fields) fields.innerHTML = ‘’;
-}, 250);
-}
+```
+
 }
 
 function cmdCancel() {
@@ -6565,9 +6560,9 @@ subBtn.style.display = ‘none’;
 canBtn.style.display = ‘none’;
 [tierEl, scopeEl, typeEl].forEach(function(el) { if (el) el.style.display = ‘none’; });
 if (status) status.textContent = ‘’;
-var fields = document.getElementById(‘cmd-args-fields’);
-if (fields) fields.innerHTML = ‘’;
-if (ta) { ta.value = ‘’; ta.placeholder = ‘Username or email…’; }
+var dynFields = document.getElementById(‘cmd-dynamic-fields’);
+if (dynFields) dynFields.remove();
+if (ta) { ta.value = ‘’; ta.placeholder = ‘Username, email, or arguments…’; }
 }
 
 // ── FILTERED VIEW USERS ──────────────────────────────

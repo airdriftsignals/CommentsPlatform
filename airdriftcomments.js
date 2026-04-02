@@ -423,7 +423,8 @@ loadRateTimestamps();
 loadPendingItems();
 loadReportedItems();
 updateUI();
-if (currentUser) showSignedInToast(false); // suppress if already shown this session
+if (currentUser) showSignedInToast(false);
+if (currentUser) checkPendingFlairModals(); // suppress if already shown this session
 if (currentUser) updateSubscribeBtn();
 renderComments();
 // First visit (no WELCOME_SEEN_KEY) → welcome modal on scroll
@@ -2650,6 +2651,10 @@ card.innerHTML =
     (isOwner ? ' <span class="comment-badge" style="font-size:9px;">&#x270D;&#xFE0F; Author</span>' :
      isModerator ? ' <span class="mod-badge" style="font-size:9px;">&#x1F6E1;&#xFE0F; Mod</span>' : '') +
   '</div>' +
+  // Dashboard button — visible only to the moderator viewing their own card or another mod's card
+  (currentUser && currentUser.email === MODERATOR_EMAIL && (email === MODERATOR_EMAIL || isMod(email))
+    ? '<button onclick="openDashboard()" style="display:block;width:100%;margin:6px 0 2px;background:linear-gradient(135deg,#1a3f5f,#0a2030);color:#b89f37;border:1px solid #2a5f7f;padding:6px 0;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.03em;">&#x2699;&#xFE0F; Mod Dashboard</button>'
+    : '') +
   flairHtml +
   // Tenure badge is already shown inline via getTenureBadge() inside getUserFlair; no separate label needed
   (rank ? '<div class="pc-rank">' + rank.emoji + '</div>' +
@@ -2657,7 +2662,10 @@ card.innerHTML =
   (getUserBio(email) ? '<div class="pc-bio" id="pc-bio-display">' + renderBioFormatted(getUserBio(email)) + '</div>' : '') +
   '<div class="pc-row"><span class="pc-label">Member since</span><span class="pc-value">' + since + '</span></div>' +
   '<div class="pc-row"><span class="pc-label">Comments</span><span class="pc-value">' + comments + '</span></div>' +
-  '<div class="pc-row"><span class="pc-label">Community rating</span><span class="pc-value" style="color:#c9a84c;text-shadow:0 0 8px rgba(201,168,76,0.5),0 0 16px rgba(201,168,76,0.2);font-weight:700;">' + rating + '</span></div>' +
+  (rating < 0
+    ? '<div class="pc-row"><span class="pc-label">Community rating</span><span class="pc-value" style="color:#ff4444;text-shadow:0 0 8px rgba(255,68,68,0.6),0 0 16px rgba(255,68,68,0.3);font-weight:700;">' + rating + '</span></div>'
+    : '<div class="pc-row"><span class="pc-label">Community rating</span><span class="pc-value" style="color:#c9a84c;text-shadow:0 0 8px rgba(201,168,76,0.5),0 0 16px rgba(201,168,76,0.2);font-weight:700;">' + rating + '</span></div>'
+  ) +
   // Tabs: main actions | settings (own card only)
   (isOwnCard ?
     '<div class="pc-tabs">' +
@@ -2801,16 +2809,24 @@ if (settingsPanel && isOwnCard) {
     subHtml;
 }
 
-// Position card near anchor
+// Position card near anchor — fully within viewport
 card.style.display = 'block';
-var aRect = anchorEl.getBoundingClientRect();
+var aRect  = anchorEl.getBoundingClientRect();
 var scrollY = window.scrollY || window.pageYOffset;
 var scrollX = window.scrollX || window.pageXOffset;
-card.style.top  = (aRect.bottom + scrollY + 4) + 'px';
+var cardW  = card.offsetWidth  || 280;
+var cardH  = card.offsetHeight || 400;
+var vw = window.innerWidth;
+var vh = window.innerHeight;
+// Horizontal: prefer left-aligned, clamp to viewport
 var left = aRect.left + scrollX;
-// Keep within viewport
-var maxLeft = window.innerWidth - 290;
-card.style.left = Math.min(left, maxLeft) + 'px';
+left = Math.max(8 + scrollX, Math.min(left, scrollX + vw - cardW - 8));
+// Vertical: prefer below anchor, flip above if not enough room
+var topBelow = aRect.bottom + scrollY + 4;
+var topAbove = aRect.top  + scrollY - cardH - 4;
+var top = (aRect.bottom + cardH + 4 <= vh) ? topBelow : Math.max(scrollY + 8, topAbove);
+card.style.left = left + 'px';
+card.style.top  = top  + 'px';
 ```
 
 }
@@ -2940,6 +2956,32 @@ function notifySubscribers(comment) {
 // as different users on the same tab works correctly too.
 function getToastKey() {
 return currentUser ? ‘airdriftToastShown:’ + currentUser.email : null;
+}
+
+// On sign-in, show modal for any unread flair_update notifications
+function checkPendingFlairModals() {
+if (!currentUser) return;
+var notifKey = NOTIF_KEY + ‘:’ + currentUser.email;
+var notifs = [];
+try { notifs = JSON.parse(localStorage.getItem(notifKey) || ‘[]’); } catch(e) {}
+var unread = notifs.filter(function(n) { return n.type === ‘flair_update’ && !n.read; });
+if (unread.length === 0) return;
+// Mark them read
+notifs.forEach(function(n) { if (n.type === ‘flair_update’) n.read = true; });
+try { localStorage.setItem(notifKey, JSON.stringify(notifs)); } catch(e) {}
+// Show modal for the most recent flair update
+var latest = unread[0];
+var tier = latest.tier;
+var fd = tier ? FLAIR_DISPLAY[tier] : null;
+if (fd) {
+var flairHtml = getUserFlair(currentUser.email);
+setTimeout(function() {
+showAnnouncement(‘Your Flair Was Updated!’,
+‘<div style="font-size:28px;margin:8px 0 12px;">’ + flairHtml + ‘</div>’ +
+‘<div style="font-size:13px;color:#aaa;">You now have <strong style="color:#b89f37;">’ + fd.label + ‘</strong> flair.</div>’,
+‘✨’);
+}, 1500);
+}
 }
 
 function showSignedInToast(forceShow) {
@@ -3612,27 +3654,41 @@ if (chatsEl && currentUser.email === MODERATOR_EMAIL) {
       lastText: lastText, lastTime: lastTime, closed: isClosed });
   });
   dmThreads.sort(function(a,b) { return b.count - a.count; });
-  if (dmThreads.length === 0) {
-    chatsEl.innerHTML = '<div style="color:#444;font-size:11px;padding:4px 0;">No chats yet.</div>';
-  } else {
-    chatsEl.innerHTML = dmThreads.map(function(d) {
-      var safeEmail = d.email.replace(/'/g,"&#39;");
-      var safeName  = escapeHTML(d.name).replace(/'/g,"&#39;");
-      var statusDot = d.closed
-        ? '<span style="color:#555;font-size:9px;margin-left:4px;">(ended)</span>'
-        : '<span style="color:#2a5f7f;font-size:9px;margin-left:4px;">(active)</span>';
-      return '<div class="mod-item" style="cursor:default;">' +
-        '<div class="mod-author">' + escapeHTML(d.name) + statusDot +
-          ' &middot; <span style="color:#555;font-size:10px;">' + d.count + ' message' + (d.count !== 1 ? 's' : '') + '</span>' +
-          ' &middot; <span style="color:#444;font-size:10px;">' + d.lastTime + '</span>' +
-        '</div>' +
-        (d.lastText ? '<div class="mod-text" style="color:#555;">' + escapeHTML(d.lastText.substring(0,80)) + (d.lastText.length>80?'...':'') + '</div>' : '') +
-        '<div class="mod-actions">' +
-          '<button class="mod-approve-btn" onclick="dashReopenChat(\'' + safeEmail + '\',\'' + safeName + '\')">&#x1F4AC; Open</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
+  var activeChats = dmThreads.filter(function(d) { return !d.closed; });
+  var closedChats = dmThreads.filter(function(d) { return d.closed; });
+  function renderChatItem(d) {
+    var safeEmail = d.email.replace(/'/g,'&#39;');
+    var safeName  = escapeHTML(d.name).replace(/'/g,'&#39;');
+    return '<div class="mod-item" style="cursor:default;">' +
+      '<div class="mod-author">' + escapeHTML(d.name) +
+        ' &middot; <span style="color:#555;font-size:10px;">' + d.count + ' msg' + (d.count !== 1 ? 's' : '') + '</span>' +
+        ' &middot; <span style="color:#444;font-size:10px;">' + d.lastTime + '</span>' +
+      '</div>' +
+      (d.lastText ? '<div class="mod-text" style="color:#555;">' + escapeHTML(d.lastText.substring(0,60)) + (d.lastText.length>60?'...':'') + '</div>' : '') +
+      '<div class="mod-actions">' +
+        '<button class="mod-approve-btn" onclick="dashReopenChat(\'' + safeEmail + '\',\'' + safeName + '\')">&#x1F4AC; Open</button>' +
+      '</div>' +
+    '</div>';
   }
+  var html = '';
+  if (activeChats.length === 0 && closedChats.length === 0) {
+    html = '<div style="color:#444;font-size:11px;padding:4px 0;">No chats yet.</div>';
+  } else {
+    if (activeChats.length > 0) {
+      html += '<div style="font-size:10px;color:#2a5f7f;text-transform:uppercase;letter-spacing:0.05em;margin:4px 0 6px;">Active</div>';
+      html += activeChats.map(renderChatItem).join('');
+    } else {
+      html += '<div style="color:#444;font-size:11px;padding:4px 0;">No active chats.</div>';
+    }
+    if (closedChats.length > 0) {
+      html += '<div style="margin-top:8px;">' +
+        '<button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';this.textContent=this.textContent.indexOf(\'▶\')===-1?\'▶ Closed Chats ('+closedChats.length+')\':\'▼ Closed Chats ('+closedChats.length+')\';"' +
+        ' style="background:none;border:none;color:#555;font-size:10px;cursor:pointer;padding:2px 0;text-transform:uppercase;letter-spacing:0.05em;">&#x25B6; Closed Chats (' + closedChats.length + ')</button>' +
+        '<div style="display:none;max-height:200px;overflow-y:auto;">' + closedChats.map(renderChatItem).join('') + '</div>' +
+      '</div>';
+    }
+  }
+  chatsEl.innerHTML = html;
 }
 
 if (currentUser.email === MODERATOR_EMAIL) {
@@ -3935,6 +3991,7 @@ if (depth >= maxDepth) {
       (reply.email === MODERATOR_EMAIL ? '<span class="comment-badge">&#x270D;&#xFE0F; Author</span>' : '') +
       (reply.email !== MODERATOR_EMAIL && isMod(reply.email) ? '<span class="mod-badge">&#x1F6E1;&#xFE0F; Moderator</span>' : '') +
       getUserFlair(reply.email) +
+      (reply.highlighted ? '<span class="highlight-badge">&#x2605; Highlighted</span>' : '') +
 
     '</div>' +
     '<div class="reply-meta">' + formatDate(reply.time) + '</div>' +
@@ -4253,14 +4310,27 @@ setTimeout(function() { statusEl.textContent = ‘’; }, 6000);
 return;
 }
 function runCmd(fn,arg){
-var statusEl=document.getElementById(‘flair-admin-status’);
-var result=fn(arg)||’’;
-var isErr = result.indexOf(‘Error’) === 0 || result === ‘Cancelled.’;
+var statusEl = document.getElementById(‘flair-admin-status’);
+var result   = fn(arg) || ‘’;
+var isErr    = result.indexOf(‘Error’) === 0 || result === ‘Cancelled.’;
 statusEl.style.color = isErr ? ‘#FF6B35’ : ‘#b89f37’;
 statusEl.textContent = result;
-// Only clear textarea on success — keep args visible on error for correction
-if (!isErr) document.getElementById(‘flair-admin-email’).value=’’;
-setTimeout(function(){statusEl.textContent=’’;},8000);
+if (isErr) {
+// Keep all fields visible so the user can correct and resubmit
+} else {
+// Success: reset dropdown and clear all dynamic fields
+var sel = document.getElementById(‘cmd-select’);
+if (sel) sel.value = ‘’;
+var ta = document.getElementById(‘flair-admin-email’);
+if (ta) { ta.value = ‘’; ta.placeholder = ‘Username, email, or arguments…’; }
+var dynFields = document.getElementById(‘cmd-dynamic-fields’);
+if (dynFields) dynFields.remove();
+var subBtn = document.getElementById(‘cmd-submit-btn’);
+var canBtn = document.getElementById(‘cmd-cancel-btn’);
+if (subBtn) subBtn.style.display = ‘none’;
+if (canBtn) canBtn.style.display = ‘none’;
+}
+setTimeout(function(){ statusEl.textContent = ‘’; }, 8000);
 }
 var rawT=raw.trim(),m;
 if((m=rawT.match(/^assignmod((.+))$/i)))     {runCmd(adminAssignMods,m[1]);renderComments();return;}
@@ -4362,19 +4432,26 @@ changed.forEach(function(em) {
 var notifKey2 = ‘airdriftNotifications:’ + em;
 try {
 var rn2 = JSON.parse(localStorage.getItem(notifKey2) || ‘[]’);
-rn2.unshift({ id:‘flair_’+Date.now()+’_’+em, type:‘system’, read:false,
+rn2.unshift({ id:‘flair_’+Date.now()+’_’+em, type:‘flair_update’, read:false,
 fromName:‘AirdriftSignals’,
-preview: (fd2 ? fd2.symbol + ’ ’ : ‘’) + ‘Your flair has been updated to ’ + (fd2 ? fd2.label : tier) + ‘!’,
+tier: tier,
+preview: ‘✨ Your flair has been updated to ’ + (fd2 ? fd2.label : tier) + ‘! Sign in to see your new badge.’,
 time: new Date().toISOString(), pageUrl: window.location.pathname });
 localStorage.setItem(notifKey2, JSON.stringify(rn2));
 } catch(e) {}
 });
-// If current user’s own flair changed, show them a modal
+// If current user’s own flair changed, show flair modal with styled symbol
 if (currentUser && changed.indexOf(currentUser.email) !== -1) {
 var fd3 = FLAIR_DISPLAY[tier];
+if (fd3) {
+var flairHtmlModal = getUserFlair(currentUser.email);
 showAnnouncement(‘Flair Updated!’,
-‘You now have ’ + (fd3 ? fd3.symbol + ’ <strong>’ + fd3.label + ‘</strong>’ : tier) + ’ flair.’,
-fd3 ? fd3.symbol : ‘✨’);
+‘<div style="font-size:28px;margin:8px 0 12px;">’ + flairHtmlModal + ‘</div>’ +
+‘<div style="font-size:13px;color:#aaa;">You now have <strong style="color:#b89f37;">’ + fd3.label + ‘</strong> flair.</div>’,
+‘✨’);
+} else {
+showAnnouncement(‘Flair Updated!’, ‘Your flair has been updated.’, ‘✨’);
+}
 }
 }
 // Only save and render if something actually changed
@@ -5002,6 +5079,22 @@ var taken = Object.keys(usernameMap).some(function(k) {
 return !k.endsWith(’*seen’) && usernameMap[k].toLowerCase() === newName.toLowerCase() && k !== activeDmEmail;
 });
 if (taken) { alert(‘That username is already taken.’); return; }
+// Retroactively update all past comments and replies across all pages
+for (var ki = 0; ki < localStorage.length; ki++) {
+var kk = localStorage.key(ki);
+if (!kk || kk.indexOf(‘airdriftComments:’) !== 0) continue;
+try {
+var stored = JSON.parse(localStorage.getItem(kk));
+var dirty = false;
+stored.forEach(function(c) {
+if (c.email === activeDmEmail) { c.name = newName; dirty = true; }
+(c.replies || []).forEach(function(r) {
+if (r.email === activeDmEmail) { r.name = newName; dirty = true; }
+});
+});
+if (dirty) localStorage.setItem(kk, JSON.stringify(stored));
+} catch(e) {}
+}
 usernameMap[activeDmEmail] = newName;
 saveUsernames();
 // Notify user
@@ -5300,6 +5393,8 @@ subs[pageUrl] = true;
 delete subs[pageUrl];
 }
 localStorage.setItem(SUBSCRIPTIONS_KEY, JSON.stringify(subs));
+// Update the subscribe button in the header immediately
+if (pageUrl === window.location.pathname) updateSubscribeBtn();
 }
 
 // ── ADJUST RATING (admin testing command) ──────────
@@ -5919,7 +6014,7 @@ var allColors = COLOR_BASIC_TIERS.indexOf(tier) !== -1
 : [];
 var valid = allColors.some(function(c) { return c.value === stored; });
 if (!valid) return ‘’;
-return ’ style=“color:’ + stored + ’ !important;”’;
+return ’ style=“color:’ + stored + ’ !important;-webkit-text-fill-color:’ + stored + ’ !important;”’;
 }
 
 // ── BIO ──────────────────────────────────────────────
@@ -6213,14 +6308,16 @@ btn.style.border = ‘2px solid ’ + (isSelected ? ‘#fff’ : ‘transparent�
 // Update profile card name color live
 var pcNameSpan = document.querySelector(’#profile-card .pc-name span’);
 if (pcNameSpan) {
-if (color) {
-pcNameSpan.style.color = color;
-pcNameSpan.style.webkitTextFillColor = color;
-} else {
-pcNameSpan.style.color = ‘’;
-pcNameSpan.style.webkitTextFillColor = ‘’;
+pcNameSpan.style.color = color || ‘’;
+pcNameSpan.style.webkitTextFillColor = color || ‘’;
 }
+// Also update all comment/reply name spans in the current view
+document.querySelectorAll(’[data-email=”’ + currentUser.email + ‘”]’).forEach(function(el) {
+if (el.classList.contains(‘comment-name’) || el.classList.contains(‘reply-name’)) {
+el.style.color = color || ‘’;
+el.style.webkitTextFillColor = color || ‘’;
 }
+});
 }
 
 // ── POST BODY SHOUTOUT MENTIONS ─────────────────────

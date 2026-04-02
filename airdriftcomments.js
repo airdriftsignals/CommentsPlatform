@@ -6418,6 +6418,7 @@ if (cmd === 'AssignFlair') {
   }
   if (def && def.tierSelect) {
     // Commands with a flair tier dropdown followed by their argument inputs
+    if (!fields || !wrap) { console.warn('cmd-args-fields or cmd-args-wrap not found'); return; }
     var tierDropdown = document.createElement('select');
     tierDropdown.className = 'flair-admin-select';
     tierDropdown.setAttribute('data-role', 'tier-select');
@@ -6456,8 +6457,9 @@ if (cmd === 'AssignFlair') {
       });
       fields.appendChild(inp);
     });
-    wrap.style.display = 'flex';
-    // Focus first input if any, else the dropdown
+    // Show wrap before focusing so elements are measurable
+    wrap.style.display = 'block';
+    fields.style.display = 'flex';
     setTimeout(function() {
       var first = fields.querySelector('input');
       if (first) first.focus(); else tierDropdown.focus();
@@ -6482,7 +6484,8 @@ if (cmd === 'AssignFlair') {
       });
       fields.appendChild(inp);
     });
-    wrap.style.display = 'flex';
+    wrap.style.display = 'block';
+    fields.style.display = 'flex';
     setTimeout(function() { var f = fields.querySelector('input'); if (f) f.focus(); }, 50);
   } else if (def && def.optional) {
     // No required args -- textarea is optional filter. Show a hint.

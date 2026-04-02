@@ -2671,6 +2671,32 @@ if (settingsPanel && isOwnCard) {
       '<div style="margin:10px 0 4px;font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.06em;">Username Color' + (isPremium ? ' <span style="color:#b89f37;font-style:normal;">+ Premium</span>' : '') + '</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">' + swatches + '</div>';
   }
+  // Hover text picker — Subscriber+ with options defined for their tier
+  var hoverHtml = '';
+  if (userTierSelf && HOVER_PICKER_TIERS.indexOf(userTierSelf) !== -1) {
+    var tierOpts = HOVER_OPTIONS[userTierSelf] || [];
+    if (tierOpts.length > 0) {
+      var currentHover = '';
+      try {
+        var ub = JSON.parse(localStorage.getItem('airdriftFlairColorByUser:' + currentUser.email) || 'null');
+        if (ub) currentHover = ub.tooltip || '';
+        else {
+          var ovr = FLAIR_COLOR_BY_USER[currentUser.email] || {};
+          currentHover = ovr.tooltip || '';
+        }
+      } catch(e) {}
+      var hoverOpts = tierOpts.map(function(opt) {
+        var sel = currentHover === opt ? ' selected' : '';
+        return '<option value="' + escapeHTML(opt) + '"' + sel + '>' + escapeHTML(opt) + '</option>';
+      }).join('');
+      hoverHtml =
+        '<div style="margin:10px 0 4px;font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.06em;">Flair Hover Text</div>' +
+        '<select onchange="pcSetHoverText(this)" style="width:100%;background:#111;border:1px solid #2a2a2a;color:#aaa;padding:5px 8px;border-radius:4px;font-size:11px;font-family:inherit;outline:none;margin-bottom:8px;">' +
+          '<option value="">-- None --</option>' +
+          hoverOpts +
+        '</select>';
+    }
+  }
   settingsPanel.innerHTML =
     '<div class="pc-setting-row">' +
       '<div class="pc-setting-label">&#x2600;&#xFE0F; Light / Dark Mode</div>' +
@@ -2678,6 +2704,7 @@ if (settingsPanel && isOwnCard) {
     '</div>' +
     bioHtml +
     colorHtml +
+    hoverHtml +
     badgeDropdown +
     '<div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.06em;margin:10px 0 4px;">Subscriptions</div>' +
     subHtml;
@@ -4157,6 +4184,13 @@ if(rawT.match(/^bannedusers(\s*)$/i)||rawT.match(/^bannedusers$/i)) {openBannedU
 if((m=rawT.match(/^bannedusers((.+))$/i))) {openBannedUsers(m[1]);return;}
 if((m=rawT.match(/^restrictpage((.+))$/i)))   {runCmd(adminRestrictPage,m[1]);return;}
 if((m=rawT.match(/^unrestrictpage((.+))$/i))) {runCmd(adminUnrestrictPage,m[1]);return;}
+if((m=rawT.match(/^flairtext((.+))$/i)))      {runCmd(adminFlairText,m[1]);return;}
+if((m=rawT.match(/^hoveradd((.+))$/i)))       {runCmd(adminHoverAdd,m[1]);return;}
+if((m=rawT.match(/^hoverremove((.+))$/i)))    {runCmd(adminHoverRemove,m[1]);return;}
+if((m=rawT.match(/^hovertiers((.+))$/i)))     {runCmd(adminHoverTiers,m[1]);return;}
+if((m=rawT.match(/^hovercount((.+))$/i)))     {runCmd(adminHoverCount,m[1]);return;}
+if((m=rawT.match(/^hoverlist((.+))$/i)))      {runCmd(adminHoverList,m[1]);return;}
+if(rawT.match(/^hoverlist(\s*)$/i)||rawT.match(/^hoverlist$/i)) {runCmd(adminHoverList,‘all’);return;}
 if((m=rawT.match(/^adjustrating((.+))$/i)))  {runCmd(adminAdjustRating,m[1]);return;}
 if((m=rawT.match(/^flaircode((.+))$/i)))      {runCmd(adminFlairCode,m[1]);return;}
 if((m=rawT.match(/^flaircolor((.+))$/i)))     {runCmd(adminFlairColor,m[1]);return;}
@@ -5269,15 +5303,17 @@ return season + ’ '’ + String(seasonYear).slice(2);
 
 function syncDrifterSeasonTooltip() {
 var label = getDrifterSeasonLabel();
-// Only update if the label has changed from what’s stored
 var existing = FLAIR_COLOR_OVERRIDES[‘newcomer’] || {};
 if (existing.tooltip === label) return; // already current season
-// Keep existing color if set; empty string means CSS class handles it
-var newColor = existing.color || ‘’;
-FLAIR_COLOR_OVERRIDES[‘newcomer’] = { color: newColor, tooltip: label };
+// ONLY update the tooltip — never write a color value here
+// This prevents Drifter season sync from ever bleeding into other tiers
+// or stripping CSS gradients via the hasColor check in getUserFlair
+FLAIR_COLOR_OVERRIDES[‘newcomer’] = { color: existing.color || ‘’, tooltip: label };
 try {
 var st = JSON.parse(localStorage.getItem(‘airdriftFlairColors’) || ‘{}’);
-st[‘newcomer’] = { color: newColor, tooltip: label };
+// Only write tooltip key — preserve any existing color untouched
+var stored = st[‘newcomer’] || {};
+st[‘newcomer’] = { color: stored.color || ‘’, tooltip: label };
 localStorage.setItem(‘airdriftFlairColors’, JSON.stringify(st));
 } catch(e) {}
 }
@@ -5306,6 +5342,27 @@ if (!fu[k].color || fu[k].color.length === 0) { delete fu[k]; dirtyU = true; }
 if (dirtyU) localStorage.setItem(‘airdriftFlairColorByUser’, JSON.stringify(fu));
 } catch(e) {}
 })();
+
+// ── FLAIRTEXT COMMAND ──────────────────────────────
+// FlairText(flair, hover text) – sets tooltip only, never touches color or gradient
+function adminFlairText(rawInput) {
+var m = rawInput.match(/^([a-zA-Z]+),\s*(.*)$/);
+if (!m) return ‘Usage: FlairText(flair, hover text)’;
+var tier    = m[1].trim().toLowerCase();
+var tooltip = m[2].trim();
+if (!FLAIR_DISPLAY[tier]) return ‘Error: unknown flair tier “’ + tier + ‘”.’;
+// Read existing override — preserve color, only update tooltip
+var existing = FLAIR_COLOR_OVERRIDES[tier] || {};
+FLAIR_COLOR_OVERRIDES[tier] = { color: existing.color || ‘’, tooltip: tooltip };
+try {
+var st = JSON.parse(localStorage.getItem(‘airdriftFlairColors’) || ‘{}’);
+var stored = st[tier] || {};
+st[tier] = { color: stored.color || ‘’, tooltip: tooltip };
+localStorage.setItem(‘airdriftFlairColors’, JSON.stringify(st));
+} catch(e) {}
+renderComments();
+return ‘Done. ’ + FLAIR_DISPLAY[tier].label + ’ hover text set to: “’ + tooltip + ‘”.’;
+}
 
 function adminFlairColor(rawInput) {
 // FlairColor(flair, color, hovertext, user)
@@ -5773,6 +5830,21 @@ function getUserBio(email) {
 try { return localStorage.getItem(‘airdriftBio:’ + email) || ‘’; } catch(e) { return ‘’; }
 }
 
+function pcSetHoverText(sel) {
+if (!currentUser) return;
+var text = sel.value;
+// Update the user’s flair color-by-user entry — preserve color, update tooltip
+var existing = FLAIR_COLOR_BY_USER[currentUser.email] || {};
+var updated = { color: existing.color || ‘’, tooltip: text };
+FLAIR_COLOR_BY_USER[currentUser.email] = updated;
+try {
+var cu = JSON.parse(localStorage.getItem(‘airdriftFlairColorByUser’) || ‘{}’);
+cu[currentUser.email] = updated;
+localStorage.setItem(‘airdriftFlairColorByUser’, JSON.stringify(cu));
+} catch(e) {}
+renderComments();
+}
+
 function pcBioCounter(ta) {
 var el = document.getElementById(‘pc-bio-chars’);
 if (el) el.textContent = ta.value.length + ‘/160’;
@@ -6179,11 +6251,112 @@ document.head.appendChild(el);
 })();
 
 // ── COMMAND PANEL ───────────────────────────────────
+// ── HOVER TEXT PICKER OPTIONS ────────────────────────
+var HOVER_OPTIONS_KEY = ‘airdriftHoverOptions’;
+var HOVER_TIERS_KEY   = ‘airdriftHoverTiers’;
+var HOVER_COUNT_KEY   = ‘airdriftHoverCount’;
+
+// Which tiers can use the hover text picker (default: subscriber and up)
+var HOVER_PICKER_TIERS = [‘subscriber’,‘member’,‘collector’,‘artist’,‘writer’];
+
+// Max options per tier (default: 5)
+var HOVER_MAX_COUNT = {};
+
+// Predefined options per tier: { tier: [‘option1’, …] }
+var HOVER_OPTIONS = {};
+
+// Load saved hover data
+(function() {
+try {
+var o = JSON.parse(localStorage.getItem(HOVER_OPTIONS_KEY) || ‘{}’);
+Object.keys(o).forEach(function(k) { HOVER_OPTIONS[k] = o[k]; });
+} catch(e) {}
+try {
+var t = JSON.parse(localStorage.getItem(HOVER_TIERS_KEY) || ‘[]’);
+if (t.length) HOVER_PICKER_TIERS = t;
+} catch(e) {}
+try {
+var c = JSON.parse(localStorage.getItem(HOVER_COUNT_KEY) || ‘{}’);
+Object.keys(c).forEach(function(k) { HOVER_MAX_COUNT[k] = c[k]; });
+} catch(e) {}
+})();
+
+function saveHoverOptions() {
+try { localStorage.setItem(HOVER_OPTIONS_KEY, JSON.stringify(HOVER_OPTIONS)); } catch(e) {}
+}
+
+function adminHoverAdd(rawInput) {
+var m = rawInput.match(/^([a-zA-Z]+),\s*(.+)$/);
+if (!m) return ‘Usage: HoverAdd(flair, option text)’;
+var tier   = m[1].trim().toLowerCase();
+var option = m[2].trim();
+if (!FLAIR_DISPLAY[tier]) return ‘Error: unknown flair tier “’ + tier + ‘”.’;
+if (!HOVER_OPTIONS[tier]) HOVER_OPTIONS[tier] = [];
+var max = HOVER_MAX_COUNT[tier] || 5;
+if (HOVER_OPTIONS[tier].length >= max) return ’Error: max ’ + max + ’ options for ’ + tier + ‘. Use HoverCount to increase or HoverRemove to free a slot.’;
+if (HOVER_OPTIONS[tier].indexOf(option) !== -1) return ’Error: that option already exists for ’ + tier + ‘.’;
+HOVER_OPTIONS[tier].push(option);
+saveHoverOptions();
+return ‘Done. Added to ’ + FLAIR_DISPLAY[tier].label + ‘: “’ + option + ‘” (’ + HOVER_OPTIONS[tier].length + ‘/’ + max + ’ slots used).’;
+}
+
+function adminHoverRemove(rawInput) {
+var m = rawInput.match(/^([a-zA-Z]+),\s*(.+)$/);
+if (!m) return ‘Usage: HoverRemove(flair, option text)’;
+var tier   = m[1].trim().toLowerCase();
+var option = m[2].trim();
+if (!FLAIR_DISPLAY[tier]) return ‘Error: unknown flair tier “’ + tier + ‘”.’;
+if (!HOVER_OPTIONS[tier] || HOVER_OPTIONS[tier].length === 0) return ’Error: no options set for ’ + tier + ‘.’;
+var idx = HOVER_OPTIONS[tier].indexOf(option);
+if (idx === -1) return ‘Error: option “’ + option + ’” not found for ’ + tier + ‘.’;
+HOVER_OPTIONS[tier].splice(idx, 1);
+saveHoverOptions();
+return ’Done. Removed from ’ + FLAIR_DISPLAY[tier].label + ‘: “’ + option + ‘”.’;
+}
+
+function adminHoverTiers(rawInput) {
+// HoverTiers(subscriber, member, collector) – sets which tiers see the picker
+var tiers = rawInput.split(’,’).map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+var valid  = [‘newcomer’,‘supporter’,‘subscriber’,‘member’,‘collector’,‘artist’,‘writer’];
+var bad    = tiers.filter(function(t) { return valid.indexOf(t) === -1; });
+if (bad.length) return ‘Error: unknown tier(s): ’ + bad.join(’, ’);
+HOVER_PICKER_TIERS = tiers;
+try { localStorage.setItem(HOVER_TIERS_KEY, JSON.stringify(tiers)); } catch(e) {}
+return ‘Done. Hover text picker available to: ’ + tiers.join(’, ’) + ‘.’;
+}
+
+function adminHoverCount(rawInput) {
+// HoverCount(flair, n) – sets max options for a tier
+var m = rawInput.match(/^([a-zA-Z]+),\s*(\d+)$/);
+if (!m) return ‘Usage: HoverCount(flair, number)’;
+var tier = m[1].trim().toLowerCase();
+var n    = parseInt(m[2]);
+if (!FLAIR_DISPLAY[tier]) return ‘Error: unknown flair tier “’ + tier + ‘”.’;
+if (n < 1 || n > 20) return ‘Error: count must be between 1 and 20.’;
+HOVER_MAX_COUNT[tier] = n;
+try {
+var c = JSON.parse(localStorage.getItem(HOVER_COUNT_KEY) || ‘{}’);
+c[tier] = n; localStorage.setItem(HOVER_COUNT_KEY, JSON.stringify(c));
+} catch(e) {}
+return ’Done. ’ + FLAIR_DISPLAY[tier].label + ’ max hover options set to ’ + n + ‘.’;
+}
+
+function adminHoverList(rawInput) {
+// HoverList(flair) – shows current options for a tier
+var tier = rawInput.trim().toLowerCase();
+if (!FLAIR_DISPLAY[tier]) return ‘Error: unknown flair tier “’ + tier + ‘”.’;
+var opts = HOVER_OPTIONS[tier] || [];
+var max  = HOVER_MAX_COUNT[tier] || 5;
+if (opts.length === 0) return FLAIR_DISPLAY[tier].label + ’ has no hover options set.’;
+return FLAIR_DISPLAY[tier].label + ’ (’ + opts.length + ‘/’ + max + ‘): ’ + opts.map(function(o,i){return (i+1)+’. ‘+o;}).join(’ | ’);
+}
+
 var CMD_DEFS = {
 AssignMod:      { args: [‘Username’] },
 RemoveMod:      { args: [‘Username’] },
 FlairCode:      { args: [‘Flair’, ‘Code’], tierSelect: true },
-FlairColor:     { args: [‘Flair’, ‘#Color’, ‘Hover Text (optional)’] },
+FlairColor:     { args: [’#Color’, ‘Hover Text (optional)’], tierSelect: true },
+FlairText:      { args: [‘Hover Text’], tierSelect: true },
 FlairTime:      { args: [‘Username’, ‘Months’, ‘Days’] },
 BanUser:        { args: [‘Username’] },
 ReinstateUser:  { args: [‘Username’] },
@@ -6195,6 +6368,11 @@ ViewUsers:      { args: [], optional: true },
 BannedUsers:    { args: [], optional: true },
 RestrictPage:   { args: [‘URL Slug’, ‘Flair1, Flair2, …’] },
 UnrestrictPage: { args: [‘URL Slug’] },
+HoverAdd:       { args: [‘Option Text’], tierSelect: true },
+HoverRemove:    { args: [‘Option Text’], tierSelect: true },
+HoverTiers:     { args: [‘Tier1, Tier2, …’] },
+HoverCount:     { args: [‘Max Count’], tierSelect: true },
+HoverList:      { args: [], tierSelect: true },
 };
 
 function cmdSelectChange() {

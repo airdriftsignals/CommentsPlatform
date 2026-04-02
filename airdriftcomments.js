@@ -31,8 +31,8 @@ var FLAIRS_KEY      = ‘airdriftFlairs’;
 var FLAIRS_PAGE_KEY = ‘airdriftFlairs:’ + window.location.pathname;
 var flairData       = {};
 var flairPageData   = {};
-// FLAIR_CODES: use config block definition if present, otherwise defaults
-if (typeof FLAIR_CODES === ‘undefined’) { var FLAIR_CODES = {
+// FLAIR_CODES: read from Blogger config block if defined, else use defaults
+window.FLAIR_CODES = window.FLAIR_CODES || {
 supporter:  ‘CODE_SUPPORTER’,
 subscriber: ‘CODE_SUBSCRIBER’,
 newcomer:   ‘CODE_DRIFTER’,
@@ -40,7 +40,8 @@ member:     ‘CODE_MEMBER’,
 collector:  ‘CODE_COLLECTOR’,
 artist:     ‘CODE_ARTIST’,
 writer:     ‘CODE_WRITER’
-}; }
+};
+var FLAIR_CODES = window.FLAIR_CODES;
 var FLAIR_DISPLAY = {
 newcomer:   { symbol: ‘꩜’, label: ‘Drifter’,       css: ‘flair-newcomer’ },
 supporter:  { symbol: ‘★’, label: ‘Supporter’,      css: ‘flair-supporter’ },

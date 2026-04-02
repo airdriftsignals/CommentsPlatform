@@ -6407,13 +6407,20 @@ if (cmd === 'AssignFlair') {
 } else {
   // Show argument input fields
   var def = CMD_DEFS[cmd];
-  if (ta) ta.placeholder = def && def.args.length ? def.args.join(', ') + '...' : 'No arguments needed';
+  if (ta) {
+    if (def && def.tierSelect) {
+      ta.placeholder = 'Optional: type full command here instead';
+    } else if (def && def.args.length) {
+      ta.placeholder = def.args.join(', ') + '...';
+    } else {
+      ta.placeholder = 'No arguments needed';
+    }
+  }
   if (def && def.tierSelect) {
-    // FlairCode: show tier dropdown + code input
-    var sel2 = document.createElement('select');
-    sel2.className = 'flair-admin-select';
-    sel2.setAttribute('data-idx', '0');
-    sel2.setAttribute('data-role', 'tier-select');
+    // Commands with a flair tier dropdown followed by their argument inputs
+    var tierDropdown = document.createElement('select');
+    tierDropdown.className = 'flair-admin-select';
+    tierDropdown.setAttribute('data-role', 'tier-select');
     var tierOpts = [
       {val:'newcomer',  label:'Drifter'},
       {val:'supporter', label:'Supporter'},
@@ -6424,26 +6431,37 @@ if (cmd === 'AssignFlair') {
       {val:'writer',    label:'Featured Writer'},
     ];
     var defOpt = document.createElement('option');
-    defOpt.value = ''; defOpt.textContent = '-- Select Flair --';
-    sel2.appendChild(defOpt);
+    defOpt.value = ''; defOpt.textContent = '-- Flair --';
+    tierDropdown.appendChild(defOpt);
     tierOpts.forEach(function(t) {
       var o = document.createElement('option');
       o.value = t.val; o.textContent = t.label;
-      sel2.appendChild(o);
+      tierDropdown.appendChild(o);
     });
-    var codeInp = document.createElement('input');
-    codeInp.type = 'text';
-    codeInp.placeholder = 'New code';
-    codeInp.className = 'flair-admin-input';
-    codeInp.style.cssText = 'width:140px;display:inline-block;';
-    codeInp.setAttribute('data-idx', '1');
-    codeInp.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') cmdSubmit();
+    fields.appendChild(tierDropdown);
+    // Add input fields for each arg after the tier dropdown
+    def.args.forEach(function(placeholder, idx) {
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.placeholder = placeholder;
+      inp.className = 'flair-admin-input';
+      inp.style.cssText = 'width:160px;display:inline-block;';
+      inp.setAttribute('data-idx', idx);
+      inp.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          var next = fields.querySelector('[data-idx="' + (idx + 1) + '"]');
+          if (next) next.focus(); else cmdSubmit();
+        } else if (e.key === 'Enter') { cmdSubmit(); }
+      });
+      fields.appendChild(inp);
     });
-    fields.appendChild(sel2);
-    fields.appendChild(codeInp);
     wrap.style.display = 'flex';
-    setTimeout(function() { codeInp.focus(); }, 50);
+    // Focus first input if any, else the dropdown
+    setTimeout(function() {
+      var first = fields.querySelector('input');
+      if (first) first.focus(); else tierDropdown.focus();
+    }, 50);
   } else if (def && def.args.length > 0) {
     def.args.forEach(function(placeholder, idx) {
       var inp = document.createElement('input');

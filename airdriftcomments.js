@@ -1,6 +1,16 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-02 16:36
+// Build: 2026-04-02 16:52
+
+// Load Google Fonts for community rank labels
+(function() {
+if (document.getElementById(‘airdrift-gfonts’)) return;
+var l = document.createElement(‘link’);
+l.id  = ‘airdrift-gfonts’;
+l.rel = ‘stylesheet’;
+l.href = ‘https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Alfa+Slab+One&family=Audiowide&family=Black+Ops+One&family=Boogaloo&family=Bungee+Shade&family=Butcherman&family=Caveat&family=Cinzel&family=Cinzel+Decorative&family=Creepster&family=Dancing+Script&family=Exo+2&family=IM+Fell+English&family=Libre+Baskerville&family=Lobster&family=Metal+Mania&family=Monoton&family=Orbitron&family=Oswald&family=Pacifico&family=Permanent+Marker&family=Playfair+Display&family=Righteous&family=Rubik+Glitch&family=Rye&family=Titan+One&family=Uncial+Antiqua&family=Zen+Tokyo+Zoo&display=swap’;
+document.head.appendChild(l);
+})();
 
 var allComments  = [];
 var currentUser  = null;

@@ -1,6 +1,6 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-03 20:26
+// Build: 2026-04-03 20:34
 
 // Load Google Fonts for community rank labels
 (function() {
@@ -329,17 +329,14 @@ updateUI();
 }
 
 // Google Sign-In
-// Initialize Google Sign-In — uses HTML data-attribute approach for ITP/mobile compatibility
 function initGoogleSignIn() {
 if (!window.google || !window.google.accounts) return;
 google.accounts.id.initialize({
 client_id: GOOGLE_CLIENT_ID,
 callback: handleGoogleSignInResponse,
 auto_select: false,
-itp_support: true,
-use_fedcm_for_prompt: false
+itp_support: true
 });
-// Render the official Google button — works on all browsers including mobile Safari
 var btnEl = document.getElementById(‘google-signin-btn’);
 if (btnEl) {
 btnEl.innerHTML = ‘’;
@@ -353,62 +350,59 @@ width: Math.min(280, window.innerWidth - 40)
 }
 }
 
-// Called by all sign-in buttons — ensures Google button is rendered and visible
 function signInWithGoogle() {
 if (!window.google || !window.google.accounts) {
 alert(‘Google Sign-In is still loading. Please try again in a moment.’);
 return;
 }
 initGoogleSignIn();
-// Show the comment form / sign-in area
 var form = document.getElementById(‘comment-form-guest’);
 if (form) form.style.display = ‘block’;
-// Scroll to the Google button
 var btnEl = document.getElementById(‘google-signin-btn’);
 if (btnEl) btnEl.scrollIntoView({ behavior: ‘smooth’, block: ‘center’ });
 }
 
-```
 function handleGoogleSignInResponse(response) {
-if (response.credential) {
-  try {
-    var base64Url = response.credential.split('.')[1];
-    var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    var jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-    var decoded = JSON.parse(jsonPayload);
-    var googleName = decoded.name;
-    loadUsernames();
-    var chosenName = usernameMap[decoded.email] || googleName;
-    currentUser = { name: chosenName, email: decoded.email, provider: 'google' };
-    dismissWelcomeModal();
-    sessionStorage.setItem('airdriftCurrentUser', JSON.stringify(currentUser));
-    localStorage.setItem('airdriftCurrentUser', JSON.stringify(currentUser));
-    updateUI();
-    loadRateTimestamps();
-    showSignedInToast(true); // force show on fresh sign-in
-    loadNotifications();
-    scanForNotifications();
-    scanForMentionNotifications();
-    startNotifPolling();
-    var warnCount=localStorage.getItem('airdriftWarn:'+decoded.email);
-    if(warnCount){localStorage.removeItem('airdriftWarn:'+decoded.email);
-      setTimeout(function(){alert('You have received a warning from the moderator. You now have '+warnCount+' warning'+(parseInt(warnCount)>1?'s':'')+'. ');},1000);}
-    var reinstated=localStorage.getItem('airdriftReinstate:'+decoded.email);
-    if(reinstated){localStorage.removeItem('airdriftReinstate:'+decoded.email);
-      setTimeout(function(){alert('Your account has been reinstated. Welcome back!');},1000);}
+if (!response.credential) return;
+try {
+var base64Url = response.credential.split(’.’)[1];
+var base64    = base64Url.replace(/-/g, ‘+’).replace(/_/g, ‘/’);
+var json      = decodeURIComponent(atob(base64).split(’’).map(function(c) {
+return ‘%’ + (‘00’ + c.charCodeAt(0).toString(16)).slice(-2);
+}).join(’’));
+var decoded   = JSON.parse(json);
+loadUsernames();
+var chosenName = usernameMap[decoded.email] || decoded.name;
+currentUser = { name: chosenName, email: decoded.email, provider: ‘google’ };
+dismissWelcomeModal();
+sessionStorage.setItem(‘airdriftCurrentUser’, JSON.stringify(currentUser));
+localStorage.setItem(‘airdriftCurrentUser’, JSON.stringify(currentUser));
+updateUI();
+loadRateTimestamps();
+loadNotifications();
+checkPendingFlairModals();
+updateSubscribeBtn();
+renderComments();
+showSignedInToast(true);
+scanForNotifications();
+scanForMentionNotifications();
+startNotifPolling();
 startTypingPoll();
-    // Show username modal only if never seen before
-    if (!usernameMap[decoded.email + '_seen']) {
-      showUsernameModal(googleName);
-    }
-  } catch(e) {
-    console.error('Error processing Google sign-in:', e);
-  }
+var warnCount = localStorage.getItem(‘airdriftWarn:’ + decoded.email);
+if (warnCount) {
+localStorage.removeItem(‘airdriftWarn:’ + decoded.email);
+setTimeout(function() { alert(‘You have received a warning from the moderator. You now have ’ + warnCount + ’ warning’ + (parseInt(warnCount) > 1 ? ‘s’ : ‘’) + ‘.’); }, 1000);
 }
-```
-
+var reinstated = localStorage.getItem(‘airdriftReinstate:’ + decoded.email);
+if (reinstated) {
+localStorage.removeItem(‘airdriftReinstate:’ + decoded.email);
+setTimeout(function() { alert(‘Your account has been reinstated. Welcome back!’); }, 1000);
+}
+if (!usernameMap[decoded.email + ‘_seen’]) showUsernameModal(decoded.name);
+} catch(e) {
+console.error(‘Google sign-in error:’, e);
+alert(’Sign-in error: ’ + e.message);
+}
 }
 
 // Init
@@ -419,17 +413,19 @@ input.addEventListener(‘input’, function() {
 document.getElementById(‘char-count’).textContent = this.value.length;
 });
 }
-// Initialize Google Sign-In button as soon as library is ready
+// Initialize Google Sign-In — fires immediately if library ready, else on library load
 if (window.google && window.google.accounts) {
 initGoogleSignIn();
 } else {
-// GSI library not ready yet — wait for it
-var gsiInterval = setInterval(function() {
+// GSI library loads async — use its onload callback
+window.handleGoogleSignInResponse = handleGoogleSignInResponse;
+var gsiCheck = setInterval(function() {
 if (window.google && window.google.accounts) {
-clearInterval(gsiInterval);
+clearInterval(gsiCheck);
 initGoogleSignIn();
 }
-}, 200);
+}, 100);
+setTimeout(function() { clearInterval(gsiCheck); }, 10000);
 }
 loadCurrentUser();
 loadComments();
@@ -7269,7 +7265,7 @@ if (!section) return;
 var saved = {};
 try { saved = JSON.parse(localStorage.getItem(CHECKLIST_KEY) || ‘{}’); } catch(e) {}
 
-
+```
 var header = document.createElement('div');
 header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
 var h4 = document.createElement('h4');
@@ -7322,6 +7318,6 @@ CHECKLIST_DATA.forEach(function(group) {
 });
 
 section.appendChild(body);
-
+```
 
 }

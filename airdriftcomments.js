@@ -1,6 +1,6 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-03 12:28
+// Build: 2026-04-03 12:31
 
 // Load Google Fonts for community rank labels
 (function() {
@@ -1979,7 +1979,7 @@ var sticky = document.getElementById(‘sticky-comment-box’);
 if (!sticky) return;
 
 ```
-function checkSticky() {
+var checkSticky = function() {
   if (!currentUser) { sticky.style.display = 'none'; return; }
   var widgetEl = document.getElementById('airdrift-comments');
   if (!widgetEl) { sticky.style.display = 'none'; return; }
@@ -3867,7 +3867,7 @@ var check = setInterval(function() {
   }
 }, 100);
 
-function _blockPage(tiers) {
+var _blockPage = function(tiers) {
   var names = tiers.map(function(t) { return t.charAt(0).toUpperCase() + t.slice(1); });
   var msg = 'This page requires ' +
     (names.length === 1 ? names[0] : names.slice(0,-1).join(', ') + ' or ' + names[names.length-1]) +
@@ -4347,7 +4347,7 @@ document.getElementById(‘flair-admin-email’).value = ‘’;
 setTimeout(function() { statusEl.textContent = ‘’; }, 6000);
 return;
 }
-function runCmd(fn,arg){
+var runCmd = function(fn,arg){
 var statusEl = document.getElementById(‘flair-admin-status’);
 var result   = fn(arg) || ‘’;
 var isErr    = result.indexOf(‘Error’) === 0 || result === ‘Cancelled.’;
@@ -6735,7 +6735,7 @@ setTimeout(function() {
 }
 
 ```
-function cmdSubmit() {
+var cmdSubmit = function() {
 var sel = document.getElementById('cmd-select');
 var cmd = sel.value;
 if (!cmd) return;

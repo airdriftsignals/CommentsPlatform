@@ -1281,7 +1281,7 @@
     border-color: #c4b49a;
   }
 
-  /* Light mode — bio, zenith dropdown, profile card new elements */
+  /* Light mode — profile card new elements */
   body.airdrift-light #profile-card .pc-bio { color: #3a2a10; background: #ede8de; border-radius: 4px; padding: 6px; }
   body.airdrift-light #profile-card textarea { background: #ede8de !important; color: #3a2a10 !important; border-color: #c4b49a !important; }
   body.airdrift-light #profile-card select { background: #ede8de !important; color: #3a2a10 !important; border-color: #c4b49a !important; }
@@ -1291,7 +1291,6 @@
   body.airdrift-light #profile-card .pc-tabs { border-color: #d4c9b5; }
   body.airdrift-light #profile-card .pc-tab { color: #7a6a50; }
   body.airdrift-light #profile-card .pc-tab.active { color: #5a3e10; border-color: #b89f37; }
-  body.airdrift-light #cmd-dynamic-fields input,
   body.airdrift-light .flair-admin-input { background: #ede8de !important; color: #3a2a10 !important; border-color: #c4b49a !important; }
   body.airdrift-light .flair-admin-select { background: #ede8de !important; color: #3a2a10 !important; border-color: #c4b49a !important; }
   body.airdrift-light .action-btn { color: #5a3e10; border-color: #d4c9b5; background: rgba(0,0,0,0.04); }

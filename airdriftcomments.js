@@ -1,6 +1,6 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-03 03:26
+// Build: 2026-04-03 12:28
 
 // Load Google Fonts for community rank labels
 (function() {
@@ -331,6 +331,18 @@ updateUI();
 // Google Sign-In
 // Initialize Google Sign-In once GSI library is ready
 // Renders a real Google button so mobile browsers never block it
+// Mobile debug helper — remove after debugging
+function mobileDebug(msg) {
+var el = document.getElementById(‘mobile-debug-bar’);
+if (!el) {
+el = document.createElement(‘div’);
+el.id = ‘mobile-debug-bar’;
+el.style.cssText = ‘position:fixed;bottom:0;left:0;right:0;background:#c00;color:#fff;font-size:11px;padding:6px 10px;z-index:999999;word-break:break-all;’;
+document.body.appendChild(el);
+}
+el.textContent = msg;
+}
+
 function initGoogleSignIn() {
 if (!window.google || !window.google.accounts) return;
 google.accounts.id.initialize({
@@ -356,6 +368,7 @@ if (!window.google || !window.google.accounts) {
 alert(‘Google Sign-In is still loading. Please try again in a moment.’);
 return;
 }
+mobileDebug(‘signInWithGoogle called, google=’ + (!!window.google) + ’ accounts=’ + (window.google && !!window.google.accounts));
 // Make sure button is rendered
 initGoogleSignIn();
 // Show the sign-in form if it is hidden
@@ -422,12 +435,14 @@ document.getElementById(‘char-count’).textContent = this.value.length;
 }
 // Initialize Google Sign-In button as soon as library is ready
 if (window.google && window.google.accounts) {
+mobileDebug(‘GSI ready on init’);
 initGoogleSignIn();
 } else {
 // GSI library not ready yet — wait for it
 var gsiInterval = setInterval(function() {
 if (window.google && window.google.accounts) {
 clearInterval(gsiInterval);
+mobileDebug(‘GSI ready via interval’);
 initGoogleSignIn();
 }
 }, 200);

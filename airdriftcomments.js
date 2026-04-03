@@ -1,16 +1,12 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-03 21:47
+// Build: 2026-04-03 22:11
 
-// Load Google Fonts for community rank labels
-(function() {
-  if (document.getElementById('airdrift-gfonts')) return;
-  var l = document.createElement('link');
-  l.id  = 'airdrift-gfonts';
-  l.rel = 'stylesheet';
-  l.href = 'https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Alfa+Slab+One&family=Audiowide&family=Black+Ops+One&family=Boogaloo&family=Bungee+Shade&family=Butcherman&family=Caveat&family=Cinzel&family=Cinzel+Decorative&family=Creepster&family=Dancing+Script&family=Exo+2&family=IM+Fell+English&family=Libre+Baskerville&family=Lobster&family=Metal+Mania&family=Monoton&family=Orbitron&family=Oswald&family=Pacifico&family=Permanent+Marker&family=Playfair+Display&family=Righteous&family=Rubik+Glitch&family=Rye&family=Titan+One&family=Uncial+Antiqua&family=Zen+Tokyo+Zoo&display=swap';
-  document.head.appendChild(l);
-})();
+// Load Google Fonts
+(function(){if(document.getElementById('airdrift-gfonts'))return;
+var l=document.createElement('link');l.id='airdrift-gfonts';l.rel='stylesheet';
+l.href='https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Alfa+Slab+One&family=Audiowide&family=Black+Ops+One&family=Boogaloo&family=Bungee+Shade&family=Butcherman&family=Caveat&family=Cinzel&family=Cinzel+Decorative&family=Creepster&family=Dancing+Script&family=Exo+2&family=IM+Fell+English&family=Libre+Baskerville&family=Lobster&family=Metal+Mania&family=Monoton&family=Orbitron&family=Oswald&family=Pacifico&family=Permanent+Marker&family=Playfair+Display&family=Righteous&family=Rubik+Glitch&family=Rye&family=Titan+One&family=Uncial+Antiqua&family=Zen+Tokyo+Zoo&display=swap';
+document.head.appendChild(l);})();
 
 var allComments  = [];
   var currentUser  = null;
@@ -42,17 +38,8 @@ var allComments  = [];
   var FLAIRS_PAGE_KEY = 'airdriftFlairs:' + window.location.pathname;
   var flairData       = {};
   var flairPageData   = {};
-  // FLAIR_CODES: read from Blogger config block if defined, else use defaults
-  window.FLAIR_CODES = window.FLAIR_CODES || {
-    supporter:  'CODE_SUPPORTER',
-    subscriber: 'CODE_SUBSCRIBER',
-    newcomer:   'CODE_DRIFTER',
-    member:     'CODE_MEMBER',
-    collector:  'CODE_COLLECTOR',
-    artist:     'CODE_ARTIST',
-    writer:     'CODE_WRITER'
-  };
-  var FLAIR_CODES = window.FLAIR_CODES;
+  window.FLAIR_CODES=window.FLAIR_CODES||{supporter:'CODE_SUPPORTER',subscriber:'CODE_SUBSCRIBER',newcomer:'CODE_DRIFTER',member:'CODE_MEMBER',collector:'CODE_COLLECTOR',artist:'CODE_ARTIST',writer:'CODE_WRITER'};
+  var FLAIR_CODES=window.FLAIR_CODES;
   var FLAIR_DISPLAY = {
     newcomer:   { symbol: '꩜', label: 'Drifter',       css: 'flair-newcomer' },
     supporter:  { symbol: '★', label: 'Supporter',      css: 'flair-supporter' },
@@ -384,18 +371,17 @@ var allComments  = [];
         scanForNotifications();
         scanForMentionNotifications();
         startNotifPolling();
-        startTypingPoll();
-        var warnCount = localStorage.getItem('airdriftWarn:' + decoded.email);
-        if (warnCount) {
-          localStorage.removeItem('airdriftWarn:' + decoded.email);
-          setTimeout(function() { alert('You have received a warning from the moderator. You now have ' + warnCount + ' warning' + (parseInt(warnCount) > 1 ? 's' : '') + '.'); }, 1000);
+        var warnCount=localStorage.getItem('airdriftWarn:'+decoded.email);
+        if(warnCount){localStorage.removeItem('airdriftWarn:'+decoded.email);
+          setTimeout(function(){alert('You have received a warning from the moderator. You now have '+warnCount+' warning'+(parseInt(warnCount)>1?'s':'')+'. ');},1000);}
+        var reinstated=localStorage.getItem('airdriftReinstate:'+decoded.email);
+        if(reinstated){localStorage.removeItem('airdriftReinstate:'+decoded.email);
+          setTimeout(function(){alert('Your account has been reinstated. Welcome back!');},1000);}
+    startTypingPoll();
+        // Show username modal only if never seen before
+        if (!usernameMap[decoded.email + '_seen']) {
+          showUsernameModal(googleName);
         }
-        var reinstated = localStorage.getItem('airdriftReinstate:' + decoded.email);
-        if (reinstated) {
-          localStorage.removeItem('airdriftReinstate:' + decoded.email);
-          setTimeout(function() { alert('Your account has been reinstated. Welcome back!'); }, 1000);
-        }
-        if (!usernameMap[decoded.email + '_seen']) showUsernameModal(googleName);
       } catch(e) {
         console.error('Error processing Google sign-in:', e);
       }
@@ -1321,73 +1307,23 @@ var allComments  = [];
     }
   }
 
-  // ── REACTION NOTIFICATIONS ──────────────────────────
   function sendReactionNotification(itemId, reactionData) {
-    if (!currentUser) return;
-    // Find the author of this item
-    var authorEmail = null;
-    allComments.forEach(function(c) {
-      if (c.id === itemId) authorEmail = c.email;
-      (c.replies || []).forEach(function(r) {
-        if (r.id === itemId) authorEmail = r.email;
-      });
-    });
-    if (!authorEmail || authorEmail === currentUser.email) return; // don't notify self
-    if (authorEmail === MODERATOR_EMAIL && currentUser.email !== MODERATOR_EMAIL) {
-      // notify mod too
-    }
-
-    // Collect all unique reactors across all emojis
-    var reactors = {};
-    Object.keys(reactionData).forEach(function(emoji) {
-      (reactionData[emoji] || []).forEach(function(email) {
-        if (email !== authorEmail) reactors[email] = true;
-      });
-    });
-    var reactorEmails = Object.keys(reactors);
-    if (reactorEmails.length === 0) return;
-
-    var notifKey = NOTIF_KEY + ':' + authorEmail;
-    var notifs = [];
-    try { notifs = JSON.parse(localStorage.getItem(notifKey) || '[]'); } catch(e) {}
-
-    // Find existing reaction notification for this item
-    var existingIdx = -1;
-    notifs.forEach(function(n, i) {
-      if (n.type === 'reaction' && n.itemId === itemId) existingIdx = i;
-    });
-
-    var count = reactorEmails.length;
-    var reactorName = usernameMap[currentUser.email] || currentUser.name || 'Someone';
-    var preview;
-    if (count === 1) {
-      preview = reactorName + ' reacted to your comment';
-    } else {
-      preview = count + ' users reacted to your comment';
-    }
-
-    var notif = {
-      id: existingIdx !== -1 ? notifs[existingIdx].id : 'reaction_' + itemId,
-      type: 'reaction',
-      itemId: itemId,
-      read: false,
-      fromName: reactorName,
-      preview: '&#x1F525; ' + preview,
-      time: new Date().toISOString(),
-      pageUrl: window.location.pathname
-    };
-
-    if (existingIdx !== -1) {
-      notifs[existingIdx] = notif; // update existing
-    } else {
-      notifs.unshift(notif); // add new
-    }
-
-    try { localStorage.setItem(notifKey, JSON.stringify(notifs)); } catch(e) {}
-    // If this is the current user's own notification, refresh bell
-    if (currentUser && authorEmail === currentUser.email) {
-      loadNotifications(); renderNotifBell();
-    }
+    if(!currentUser)return;
+    var authorEmail=null;
+    allComments.forEach(function(c){if(c.id===itemId)authorEmail=c.email;(c.replies||[]).forEach(function(r){if(r.id===itemId)authorEmail=r.email;});});
+    if(!authorEmail||authorEmail===currentUser.email)return;
+    var reactors={};
+    Object.keys(reactionData).forEach(function(e2){(reactionData[e2]||[]).forEach(function(em){if(em!==authorEmail)reactors[em]=true;});});
+    var cnt=Object.keys(reactors).length;if(!cnt)return;
+    var notifKey=NOTIF_KEY+':'+authorEmail;
+    var notifs=[];try{notifs=JSON.parse(localStorage.getItem(notifKey)||'[]');}catch(e){}
+    var existingIdx=-1;notifs.forEach(function(n,i){if(n.type==='reaction'&&n.itemId===itemId)existingIdx=i;});
+    var rName=usernameMap[currentUser.email]||currentUser.name||'Someone';
+    var preview=(cnt===1?rName:cnt+' users')+' reacted to your comment';
+    var notif={id:existingIdx!==-1?notifs[existingIdx].id:'reaction_'+itemId,type:'reaction',itemId:itemId,read:false,fromName:rName,preview:'&#x1F525; '+preview,time:new Date().toISOString(),pageUrl:window.location.pathname};
+    if(existingIdx!==-1)notifs[existingIdx]=notif;else notifs.unshift(notif);
+    try{localStorage.setItem(notifKey,JSON.stringify(notifs));}catch(e){}
+    if(currentUser&&authorEmail===currentUser.email){loadNotifications();renderNotifBell();}
   }
 
   function showNotifBell() {
@@ -1636,14 +1572,9 @@ var allComments  = [];
       return;
     }
     if (!currentUser) return;
-    // Check uniqueness -- no two users can share a username
-    var errorEl2 = document.getElementById('username-error');
-    var lowerName = name.toLowerCase();
-    var isTaken = Object.keys(usernameMap).some(function(k) {
-      return !k.endsWith('_seen') && k !== currentUser.email &&
-             usernameMap[k].toLowerCase() === lowerName;
-    });
-    if (isTaken) { if (errorEl2) errorEl2.textContent = 'That username is already taken.'; return; }
+    var lowerName=name.toLowerCase();
+    var isTaken=Object.keys(usernameMap).some(function(k){return !k.endsWith('_seen')&&k!==currentUser.email&&usernameMap[k].toLowerCase()===lowerName;});
+    if(isTaken){var errEl=document.getElementById('username-error');if(errEl)errEl.textContent='That username is already taken.';return;}
     usernameMap[currentUser.email] = name;
     usernameMap[currentUser.email + '_seen'] = true;
     currentUser.name = name;
@@ -2612,7 +2543,6 @@ var allComments  = [];
         (isOwner ? ' <span class="comment-badge" style="font-size:9px;">&#x270D;&#xFE0F; Author</span>' :
          isModerator ? ' <span class="mod-badge" style="font-size:9px;">&#x1F6E1;&#xFE0F; Mod</span>' : '') +
       '</div>' +
-      // Dashboard button — visible only to the moderator viewing their own card or another mod's card
       (currentUser && currentUser.email === MODERATOR_EMAIL && (email === MODERATOR_EMAIL || isMod(email))
         ? '<button onclick="openDashboard()" style="display:block;width:100%;margin:6px 0 2px;background:linear-gradient(135deg,#1a3f5f,#0a2030);color:#b89f37;border:1px solid #2a5f7f;padding:6px 0;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.03em;">&#x2699;&#xFE0F; Mod Dashboard</button>'
         : '') +
@@ -2623,10 +2553,7 @@ var allComments  = [];
       (getUserBio(email) ? '<div class="pc-bio" id="pc-bio-display">' + renderBioFormatted(getUserBio(email)) + '</div>' : '') +
       '<div class="pc-row"><span class="pc-label">Member since</span><span class="pc-value">' + since + '</span></div>' +
       '<div class="pc-row"><span class="pc-label">Comments</span><span class="pc-value">' + comments + '</span></div>' +
-      (rating < 0
-        ? '<div class="pc-row"><span class="pc-label">Community rating</span><span class="pc-value" style="color:#ff4444;text-shadow:0 0 8px rgba(255,68,68,0.6),0 0 16px rgba(255,68,68,0.3);font-weight:700;">' + rating + '</span></div>'
-        : '<div class="pc-row"><span class="pc-label">Community rating</span><span class="pc-value" style="color:#c9a84c;text-shadow:0 0 8px rgba(201,168,76,0.5),0 0 16px rgba(201,168,76,0.2);font-weight:700;">' + rating + '</span></div>'
-      ) +
+      (rating < 0 ? '<div class="pc-row"><span class="pc-label">Community rating</span><span class="pc-value" style="color:#ff4444;text-shadow:0 0 8px rgba(255,68,68,0.6),0 0 16px rgba(255,68,68,0.3);font-weight:700;">' + rating + '</span></div>' : '<div class="pc-row"><span class="pc-label">Community rating</span><span class="pc-value" style="color:#c9a84c;text-shadow:0 0 8px rgba(201,168,76,0.5),0 0 16px rgba(201,168,76,0.2);font-weight:700;">' + rating + '</span></div>') +
       // Tabs: main actions | settings (own card only)
       (isOwnCard ?
         '<div class="pc-tabs">' +
@@ -2731,32 +2658,6 @@ var allComments  = [];
           '<div style="margin:10px 0 4px;font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.06em;">Username Color' + (isPremium ? ' <span style="color:#b89f37;font-style:normal;">+ Premium</span>' : '') + '</div>' +
           '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">' + swatches + '</div>';
       }
-      // Hover text picker — Subscriber+ with options defined for their tier
-      var hoverHtml = '';
-      if (userTierSelf && HOVER_PICKER_TIERS.indexOf(userTierSelf) !== -1) {
-        var tierOpts = HOVER_OPTIONS[userTierSelf] || [];
-        if (tierOpts.length > 0) {
-          var currentHover = '';
-          try {
-            var ub = JSON.parse(localStorage.getItem('airdriftFlairColorByUser:' + currentUser.email) || 'null');
-            if (ub) currentHover = ub.tooltip || '';
-            else {
-              var ovr = FLAIR_COLOR_BY_USER[currentUser.email] || {};
-              currentHover = ovr.tooltip || '';
-            }
-          } catch(e) {}
-          var hoverOpts = tierOpts.map(function(opt) {
-            var sel = currentHover === opt ? ' selected' : '';
-            return '<option value="' + escapeHTML(opt) + '"' + sel + '>' + escapeHTML(opt) + '</option>';
-          }).join('');
-          hoverHtml =
-            '<div style="margin:10px 0 4px;font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.06em;">Flair Hover Text</div>' +
-            '<select onchange="pcSetHoverText(this)" style="width:100%;background:#111;border:1px solid #2a2a2a;color:#aaa;padding:5px 8px;border-radius:4px;font-size:11px;font-family:inherit;outline:none;margin-bottom:8px;">' +
-              '<option value="">-- None --</option>' +
-              hoverOpts +
-            '</select>';
-        }
-      }
       settingsPanel.innerHTML =
         '<div class="pc-setting-row">' +
           '<div class="pc-setting-label">&#x2600;&#xFE0F; Light / Dark Mode</div>' +
@@ -2764,30 +2665,20 @@ var allComments  = [];
         '</div>' +
         bioHtml +
         colorHtml +
-        hoverHtml +
         badgeDropdown +
         '<div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:0.06em;margin:10px 0 4px;">Subscriptions</div>' +
         subHtml;
     }
 
-    // Position card near anchor — fully within viewport
-    card.style.display = 'block';
-    var aRect  = anchorEl.getBoundingClientRect();
-    var scrollY = window.scrollY || window.pageYOffset;
-    var scrollX = window.scrollX || window.pageXOffset;
-    var cardW  = card.offsetWidth  || 280;
-    var cardH  = card.offsetHeight || 400;
-    var vw = window.innerWidth;
-    var vh = window.innerHeight;
-    // Horizontal: prefer left-aligned, clamp to viewport
-    var left = aRect.left + scrollX;
-    left = Math.max(8 + scrollX, Math.min(left, scrollX + vw - cardW - 8));
-    // Vertical: prefer below anchor, flip above if not enough room
-    var topBelow = aRect.bottom + scrollY + 4;
-    var topAbove = aRect.top  + scrollY - cardH - 4;
-    var top = (aRect.bottom + cardH + 4 <= vh) ? topBelow : Math.max(scrollY + 8, topAbove);
-    card.style.left = left + 'px';
-    card.style.top  = top  + 'px';
+    // Position card near anchor
+    card.style.display='block';
+    var aRect=anchorEl.getBoundingClientRect();
+    var scrollY=window.scrollY||window.pageYOffset,scrollX=window.scrollX||window.pageXOffset;
+    var cardW=card.offsetWidth||280,cardH=card.offsetHeight||400,vw=window.innerWidth,vh=window.innerHeight;
+    var left=aRect.left+scrollX;left=Math.max(8+scrollX,Math.min(left,scrollX+vw-cardW-8));
+    var topBelow=aRect.bottom+scrollY+4,topAbove=aRect.top+scrollY-cardH-4;
+    var top=(aRect.bottom+cardH+4<=vh)?topBelow:Math.max(scrollY+8,topAbove);
+    card.style.left=left+'px';card.style.top=top+'px';
   }
 
   function closeProfileCard() {
@@ -2917,30 +2808,16 @@ var allComments  = [];
     return currentUser ? 'airdriftToastShown:' + currentUser.email : null;
   }
 
-  // On sign-in, show modal for any unread flair_update notifications
   function checkPendingFlairModals() {
-    if (!currentUser) return;
-    var notifKey = NOTIF_KEY + ':' + currentUser.email;
-    var notifs = [];
-    try { notifs = JSON.parse(localStorage.getItem(notifKey) || '[]'); } catch(e) {}
-    var unread = notifs.filter(function(n) { return n.type === 'flair_update' && !n.read; });
-    if (unread.length === 0) return;
-    // Mark them read
-    notifs.forEach(function(n) { if (n.type === 'flair_update') n.read = true; });
-    try { localStorage.setItem(notifKey, JSON.stringify(notifs)); } catch(e) {}
-    // Show modal for the most recent flair update
-    var latest = unread[0];
-    var tier = latest.tier;
-    var fd = tier ? FLAIR_DISPLAY[tier] : null;
-    if (fd) {
-      var flairHtml = getUserFlair(currentUser.email);
-      setTimeout(function() {
-        showAnnouncement('Your Flair Was Updated!',
-          '<div style="font-size:28px;margin:8px 0 12px;">' + flairHtml + '</div>' +
-          '<div style="font-size:13px;color:#aaa;">You now have <strong style="color:#b89f37;">' + fd.label + '</strong> flair.</div>',
-          '✨');
-      }, 1500);
-    }
+    if(!currentUser)return;
+    var nk=NOTIF_KEY+':'+currentUser.email,notifs=[];
+    try{notifs=JSON.parse(localStorage.getItem(nk)||'[]');}catch(e){}
+    var unread=notifs.filter(function(n){return n.type==='flair_update'&&!n.read;});
+    if(!unread.length)return;
+    notifs.forEach(function(n){if(n.type==='flair_update')n.read=true;});
+    try{localStorage.setItem(nk,JSON.stringify(notifs));}catch(e){}
+    var fd=unread[0].tier?FLAIR_DISPLAY[unread[0].tier]:null;
+    if(fd){var fh=getUserFlair(currentUser.email);setTimeout(function(){showAnnouncement('Your Flair Was Updated!','<div style="font-size:28px;margin:8px 0 12px;">'+fh+'</div><div style="font-size:13px;color:#aaa;">You now have <strong style="color:#b89f37;">'+fd.label+'</strong> flair.</div>','&#x2728;');},1500);}
   }
 
   function showSignedInToast(forceShow) {
@@ -3609,41 +3486,24 @@ var allComments  = [];
           lastText: lastText, lastTime: lastTime, closed: isClosed });
       });
       dmThreads.sort(function(a,b) { return b.count - a.count; });
-      var activeChats = dmThreads.filter(function(d) { return !d.closed; });
-      var closedChats = dmThreads.filter(function(d) { return d.closed; });
-      var renderChatItem = function(d) {
-        var safeEmail = d.email.replace(/'/g,'&#39;');
-        var safeName  = escapeHTML(d.name).replace(/'/g,'&#39;');
-        return '<div class="mod-item" style="cursor:default;">' +
-          '<div class="mod-author">' + escapeHTML(d.name) +
-            ' &middot; <span style="color:#555;font-size:10px;">' + d.count + ' msg' + (d.count !== 1 ? 's' : '') + '</span>' +
-            ' &middot; <span style="color:#444;font-size:10px;">' + d.lastTime + '</span>' +
-          '</div>' +
-          (d.lastText ? '<div class="mod-text" style="color:#555;">' + escapeHTML(d.lastText.substring(0,60)) + (d.lastText.length>60?'...':'') + '</div>' : '') +
-          '<div class="mod-actions">' +
-            '<button class="mod-approve-btn" onclick="dashReopenChat(\'' + safeEmail + '\',\'' + safeName + '\')">&#x1F4AC; Open</button>' +
-          '</div>' +
-        '</div>';
+      var activeChats=dmThreads.filter(function(d){return !d.closed;});
+      var closedChats=dmThreads.filter(function(d){return d.closed;});
+      var renderChatItem=function(d){
+        var safeEmail=d.email.replace(/'/g,'&#39;'),safeName=escapeHTML(d.name).replace(/'/g,'&#39;');
+        return '<div class="mod-item" style="cursor:default;"><div class="mod-author">'+escapeHTML(d.name)+
+          ' &middot; <span style="color:#555;font-size:10px;">'+d.count+' msg'+(d.count!==1?'s':'')+
+          '</span> &middot; <span style="color:#444;font-size:10px;">'+d.lastTime+'</span></div>'+
+          (d.lastText?'<div class="mod-text" style="color:#555;">'+escapeHTML(d.lastText.substring(0,60))+(d.lastText.length>60?'...':'')+'</div>':'')+
+          '<div class="mod-actions"><button class="mod-approve-btn" onclick="dashReopenChat(\''+safeEmail+'\',\''+safeName+'\')">&#x1F4AC; Open</button></div></div>';
+      };
+      var chatsHtml='';
+      if(!activeChats.length&&!closedChats.length){chatsHtml='<div style="color:#444;font-size:11px;padding:4px 0;">No chats yet.</div>';}
+      else{
+        if(activeChats.length) chatsHtml+='<div style="font-size:10px;color:#2a5f7f;text-transform:uppercase;letter-spacing:0.05em;margin:4px 0 6px;">Active</div>'+activeChats.map(renderChatItem).join('');
+        else chatsHtml+='<div style="color:#444;font-size:11px;padding:4px 0;">No active chats.</div>';
+        if(closedChats.length) chatsHtml+='<div style="margin-top:8px;"><button onclick="var n=this.nextElementSibling;n.style.display=n.style.display===\'none\'?\'block\':\'none\';" style="background:none;border:none;color:#555;font-size:10px;cursor:pointer;padding:2px 0;text-transform:uppercase;">&#x25B6; Closed ('+closedChats.length+')</button><div style="display:none;max-height:200px;overflow-y:auto;">'+closedChats.map(renderChatItem).join('')+'</div></div>';
       }
-      var html = '';
-      if (activeChats.length === 0 && closedChats.length === 0) {
-        html = '<div style="color:#444;font-size:11px;padding:4px 0;">No chats yet.</div>';
-      } else {
-        if (activeChats.length > 0) {
-          html += '<div style="font-size:10px;color:#2a5f7f;text-transform:uppercase;letter-spacing:0.05em;margin:4px 0 6px;">Active</div>';
-          html += activeChats.map(renderChatItem).join('');
-        } else {
-          html += '<div style="color:#444;font-size:11px;padding:4px 0;">No active chats.</div>';
-        }
-        if (closedChats.length > 0) {
-          html += '<div style="margin-top:8px;">' +
-            '<button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\';this.textContent=this.textContent.indexOf(\'▶\')===-1?\'▶ Closed Chats ('+closedChats.length+')\':\'▼ Closed Chats ('+closedChats.length+')\';"' +
-            ' style="background:none;border:none;color:#555;font-size:10px;cursor:pointer;padding:2px 0;text-transform:uppercase;letter-spacing:0.05em;">&#x25B6; Closed Chats (' + closedChats.length + ')</button>' +
-            '<div style="display:none;max-height:200px;overflow-y:auto;">' + closedChats.map(renderChatItem).join('') + '</div>' +
-          '</div>';
-        }
-      }
-      chatsEl.innerHTML = html;
+      chatsEl.innerHTML=chatsHtml;
     }
 
     if (currentUser.email === MODERATOR_EMAIL) {
@@ -4000,8 +3860,8 @@ var allComments  = [];
         (rIsOwner && rCanEdit ? '<button class="action-btn" data-id="' + reply.id + '" data-comment-id="' + commentId + '" onclick="startEditReply(this)">✏️ Edit</button>' : '') +
         (rIsOwner ? '<button class="action-btn" style="color:#ff4444;" data-id="' + reply.id + '" data-comment-id="' + commentId + '" onclick="deleteReply(this)">🗑 Delete</button>' : '') +
         (!rIsOwner ? '<button class="action-btn" data-id="' + reply.id + '" data-email="' + reply.email + '" onclick="reportComment(this)">&#x1F6A9; Report</button>' : '') +
-        renderReactionsBar(reply.id) +
-          (currentUser && currentUser.email === MODERATOR_EMAIL ? '<button class="highlight-btn' + (reply.highlighted ? ' highlighted' : '') + '" data-id="' + reply.id + '" data-comment-id="' + commentId + '" onclick="toggleHighlightReply(this)" title="Highlight reply">&#x2605;</button>' : '') +
+        (renderReactionsBar(reply.id) +
+          currentUser && currentUser.email === MODERATOR_EMAIL ? '<button class="highlight-btn' + (reply.highlighted ? ' highlighted' : '') + '" data-id="' + reply.id + '" data-comment-id="' + commentId + '" onclick="toggleHighlightReply(this)" title="Highlight reply">&#x2605;</button>' : '') +
       '</div>' : '') +
       '<div class="reply-form" id="reply-form-' + inputKey + '">' +
         '<textarea class="reply-textarea" id="reply-input-' + inputKey + '" placeholder="Write a reply..." maxlength="2000"></textarea>' +
@@ -4249,27 +4109,17 @@ var allComments  = [];
       return;
     }
     var runCmd = function(fn,arg){
-      var statusEl = document.getElementById('flair-admin-status');
-      var result   = fn(arg) || '';
-      var isErr    = result.indexOf('Error') === 0 || result === 'Cancelled.';
-      statusEl.style.color = isErr ? '#FF6B35' : '#b89f37';
-      statusEl.textContent = result;
-      if (isErr) {
-        // Keep all fields visible so the user can correct and resubmit
-      } else {
-        // Success: reset dropdown and clear all dynamic fields
-        var sel = document.getElementById('cmd-select');
-        if (sel) sel.value = '';
-        var ta = document.getElementById('flair-admin-email');
-        if (ta) { ta.value = ''; ta.placeholder = 'Username, email, or arguments...'; }
-        var dynFields = document.getElementById('cmd-dynamic-fields');
-        if (dynFields) dynFields.remove();
-        var subBtn = document.getElementById('cmd-submit-btn');
-        var canBtn = document.getElementById('cmd-cancel-btn');
-        if (subBtn) subBtn.style.display = 'none';
-        if (canBtn) canBtn.style.display = 'none';
-      }
-      setTimeout(function(){ statusEl.textContent = ''; }, 8000);
+      var statusEl=document.getElementById('flair-admin-status');
+      var result=fn(arg)||'';
+      var isErr=result.indexOf('Error')===0||result==='Cancelled.';
+      statusEl.style.color=isErr?'#FF6B35':'#b89f37';
+      statusEl.textContent=result;
+      if(!isErr){var sel2=document.getElementById('cmd-select');if(sel2)sel2.value='';
+        var ta2=document.getElementById('flair-admin-email');if(ta2){ta2.value='';ta2.placeholder='Username, email, or arguments...';}
+        var dyn=document.getElementById('cmd-dynamic-fields');if(dyn)dyn.remove();
+        var sub2=document.getElementById('cmd-submit-btn');if(sub2)sub2.style.display='none';
+        var can2=document.getElementById('cmd-cancel-btn');if(can2)can2.style.display='none';}
+      setTimeout(function(){statusEl.textContent='';},8000);
     }
     var rawT=raw.trim(),m;
     if((m=rawT.match(/^assignmod\((.+)\)$/i)))     {runCmd(adminAssignMods,m[1]);renderComments();return;}
@@ -4285,16 +4135,15 @@ var allComments  = [];
     if((m=rawT.match(/^bannedusers\((.+)\)$/i))) {openBannedUsers(m[1]);return;}
     if((m=rawT.match(/^restrictpage\((.+)\)$/i)))   {runCmd(adminRestrictPage,m[1]);return;}
     if((m=rawT.match(/^unrestrictpage\((.+)\)$/i))) {runCmd(adminUnrestrictPage,m[1]);return;}
-    if((m=rawT.match(/^flairtext\((.+)\)$/i)))      {runCmd(adminFlairText,m[1]);return;}
-    if((m=rawT.match(/^hoveradd\((.+)\)$/i)))       {runCmd(adminHoverAdd,m[1]);return;}
-    if((m=rawT.match(/^hoverremove\((.+)\)$/i)))    {runCmd(adminHoverRemove,m[1]);return;}
-    if((m=rawT.match(/^hovertiers\((.+)\)$/i)))     {runCmd(adminHoverTiers,m[1]);return;}
-    if((m=rawT.match(/^hovercount\((.+)\)$/i)))     {runCmd(adminHoverCount,m[1]);return;}
-    if((m=rawT.match(/^hoverlist\((.+)\)$/i)))      {runCmd(adminHoverList,m[1]);return;}
-    if(rawT.match(/^hoverlist\(\s*\)$/i)||rawT.match(/^hoverlist$/i)) {runCmd(adminHoverList,'all');return;}
+    if((m=rawT.match(/^hoveradd\((.+)\)$/i))){runCmd(adminHoverAdd,m[1]);return;}
+    if((m=rawT.match(/^hoverremove\((.+)\)$/i))){runCmd(adminHoverRemove,m[1]);return;}
+    if((m=rawT.match(/^hovertiers\((.+)\)$/i))){runCmd(adminHoverTiers,m[1]);return;}
+    if((m=rawT.match(/^hovercount\((.+)\)$/i))){runCmd(adminHoverCount,m[1]);return;}
+    if((m=rawT.match(/^hoverlist\((.+)\)$/i))){runCmd(adminHoverList,m[1]);return;}
     if((m=rawT.match(/^adjustrating\((.+)\)$/i)))  {runCmd(adminAdjustRating,m[1]);return;}
     if((m=rawT.match(/^flaircode\((.+)\)$/i)))      {runCmd(adminFlairCode,m[1]);return;}
     if((m=rawT.match(/^flaircolor\((.+)\)$/i)))     {runCmd(adminFlairColor,m[1]);return;}
+    if((m=rawT.match(/^flairtext\((.+)\)$/i)))      {runCmd(adminFlairText,m[1]);return;}
     var tier     = document.getElementById('flair-admin-tier').value;
     var scope    = document.getElementById('flair-admin-scope').value;
     var statusEl = document.getElementById('flair-admin-status');
@@ -4371,26 +4220,19 @@ var allComments  = [];
         var notifKey2 = 'airdriftNotifications:' + em;
         try {
           var rn2 = JSON.parse(localStorage.getItem(notifKey2) || '[]');
-          rn2.unshift({ id:'flair_'+Date.now()+'_'+em, type:'flair_update', read:false,
+          rn2.unshift({ id:'flair_'+Date.now()+'_'+em, type:'system', read:false,
             fromName:'AirdriftSignals',
-            tier: tier,
-            preview: '&#x2728; Your flair has been updated to ' + (fd2 ? fd2.label : tier) + '! Sign in to see your new badge.',
+            preview: (fd2 ? fd2.symbol + ' ' : '') + 'Your flair has been updated to ' + (fd2 ? fd2.label : tier) + '!',
             time: new Date().toISOString(), pageUrl: window.location.pathname });
           localStorage.setItem(notifKey2, JSON.stringify(rn2));
         } catch(e) {}
       });
-      // If current user's own flair changed, show flair modal with styled symbol
+      // If current user's own flair changed, show them a modal
       if (currentUser && changed.indexOf(currentUser.email) !== -1) {
         var fd3 = FLAIR_DISPLAY[tier];
-        if (fd3) {
-          var flairHtmlModal = getUserFlair(currentUser.email);
-          showAnnouncement('Flair Updated!',
-            '<div style="font-size:28px;margin:8px 0 12px;">' + flairHtmlModal + '</div>' +
-            '<div style="font-size:13px;color:#aaa;">You now have <strong style="color:#b89f37;">' + fd3.label + '</strong> flair.</div>',
-            '✨');
-        } else {
-          showAnnouncement('Flair Updated!', 'Your flair has been updated.', '✨');
-        }
+        showAnnouncement('Flair Updated!',
+          'You now have ' + (fd3 ? fd3.symbol + ' <strong>' + fd3.label + '</strong>' : tier) + ' flair.',
+          fd3 ? fd3.symbol : '✨');
       }
     }
     // Only save and render if something actually changed
@@ -4682,15 +4524,12 @@ var allComments  = [];
         '<button onclick="confirmReport()" style="background:linear-gradient(135deg,#c03030,#8b1010);color:white;border:none;padding:8px 22px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Yes, Report</button>' +
         '<button onclick="document.getElementById(\'report-confirm-modal\').remove();_pendingReport=null;" style="background:none;border:1px solid #333;color:#888;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;">Nevermind</button>' +
       '</div>';
-    // Use a custom modal without an OK button -- Yes/Nevermind are the only actions
-    var existing = document.getElementById('report-confirm-modal');
-    if (existing) existing.remove();
-    var div = document.createElement('div');
-    div.id = 'report-confirm-modal';
-    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
-    div.innerHTML = '<div style="background:#111;border:1px solid #2a5f7f;border-radius:12px;padding:28px 28px 22px;max-width:380px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.8);"><div style="font-size:32px;margin-bottom:12px;">🚩</div><div style="font-size:16px;font-weight:700;color:#b89f37;margin-bottom:10px;">File a Report?</div>' + body + '</div>';
-    div.addEventListener('click', function(e) { if (e.target === div) { div.remove(); _pendingReport = null; } });
-    document.body.appendChild(div);
+    var rEx=document.getElementById('report-confirm-modal');if(rEx)rEx.remove();
+    var rDiv=document.createElement('div');rDiv.id='report-confirm-modal';
+    rDiv.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    rDiv.innerHTML='<div style="background:#111;border:1px solid #2a5f7f;border-radius:12px;padding:28px 28px 22px;max-width:380px;width:100%;text-align:center;"><div style="font-size:32px;margin-bottom:12px;">&#x1F6A9;</div><div style="font-size:16px;font-weight:700;color:#b89f37;margin-bottom:10px;">File a Report?</div>'+body+'</div>';
+    rDiv.addEventListener('click',function(e){if(e.target===rDiv){rDiv.remove();_pendingReport=null;}});
+    document.body.appendChild(rDiv);
   }
 
   function confirmReport() {
@@ -5010,21 +4849,13 @@ var allComments  = [];
       return !k.endsWith('_seen') && usernameMap[k].toLowerCase() === newName.toLowerCase() && k !== activeDmEmail;
     });
     if (taken) { alert('That username is already taken.'); return; }
-    // Retroactively update all past comments and replies across all pages
-    for (var ki = 0; ki < localStorage.length; ki++) {
-      var kk = localStorage.key(ki);
-      if (!kk || kk.indexOf('airdriftComments:') !== 0) continue;
-      try {
-        var stored = JSON.parse(localStorage.getItem(kk));
-        var dirty = false;
-        stored.forEach(function(c) {
-          if (c.email === activeDmEmail) { c.name = newName; dirty = true; }
-          (c.replies || []).forEach(function(r) {
-            if (r.email === activeDmEmail) { r.name = newName; dirty = true; }
-          });
-        });
-        if (dirty) localStorage.setItem(kk, JSON.stringify(stored));
-      } catch(e) {}
+    for(var ki=0;ki<localStorage.length;ki++){
+      var kk=localStorage.key(ki);
+      if(!kk||kk.indexOf('airdriftComments:')!==0)continue;
+      try{var stored=JSON.parse(localStorage.getItem(kk));var dirty=false;
+        stored.forEach(function(c){if(c.email===activeDmEmail){c.name=newName;dirty=true;}
+          (c.replies||[]).forEach(function(r){if(r.email===activeDmEmail){r.name=newName;dirty=true;}});});
+        if(dirty)localStorage.setItem(kk,JSON.stringify(stored));}catch(e){}
     }
     usernameMap[activeDmEmail] = newName;
     saveUsernames();
@@ -5275,12 +5106,12 @@ var allComments  = [];
       startX = e.clientX; startY = e.clientY;
       origLeft = parseInt(panel.style.left) || 0;
       origTop  = parseInt(panel.style.top)  || 60;
-      function onMove(e) {
+      var onMove = function(e) {
         if (!dragging) return;
         panel.style.left = (origLeft + e.clientX - startX) + 'px';
         panel.style.top  = (origTop  + e.clientY - startY) + 'px';
       }
-      function onUp() { dragging = false; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+      var onUp = function() { dragging = false; document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     };
@@ -5324,7 +5155,6 @@ var allComments  = [];
       delete subs[pageUrl];
     }
     localStorage.setItem(SUBSCRIPTIONS_KEY, JSON.stringify(subs));
-    // Update the subscribe button in the header immediately
     if (pageUrl === window.location.pathname) updateSubscribeBtn();
   }
 
@@ -5429,15 +5259,12 @@ var allComments  = [];
 
   function syncDrifterSeasonTooltip() {
     var label = getDrifterSeasonLabel();
+    // Only update if the label has changed from what's stored
     var existing = FLAIR_COLOR_OVERRIDES['newcomer'] || {};
     if (existing.tooltip === label) return; // already current season
-    // ONLY update the tooltip — never write a color value here
-    // This prevents Drifter season sync from ever bleeding into other tiers
-    // or stripping CSS gradients via the hasColor check in getUserFlair
     FLAIR_COLOR_OVERRIDES['newcomer'] = { color: existing.color || '', tooltip: label };
     try {
       var st = JSON.parse(localStorage.getItem('airdriftFlairColors') || '{}');
-      // Only write tooltip key — preserve any existing color untouched
       var stored = st['newcomer'] || {};
       st['newcomer'] = { color: stored.color || '', tooltip: label };
       localStorage.setItem('airdriftFlairColors', JSON.stringify(st));
@@ -5469,25 +5296,16 @@ var allComments  = [];
     } catch(e) {}
   })();
 
-  // ── FLAIRTEXT COMMAND ──────────────────────────────
-  // FlairText(flair, hover text) -- sets tooltip only, never touches color or gradient
   function adminFlairText(rawInput) {
-    var m = rawInput.match(/^([a-zA-Z]+),\s*(.*)$/);
-    if (!m) return 'Usage: FlairText(flair, hover text)';
-    var tier    = m[1].trim().toLowerCase();
-    var tooltip = m[2].trim();
-    if (!FLAIR_DISPLAY[tier]) return 'Error: unknown flair tier "' + tier + '".';
-    // Read existing override — preserve color, only update tooltip
-    var existing = FLAIR_COLOR_OVERRIDES[tier] || {};
-    FLAIR_COLOR_OVERRIDES[tier] = { color: existing.color || '', tooltip: tooltip };
-    try {
-      var st = JSON.parse(localStorage.getItem('airdriftFlairColors') || '{}');
-      var stored = st[tier] || {};
-      st[tier] = { color: stored.color || '', tooltip: tooltip };
-      localStorage.setItem('airdriftFlairColors', JSON.stringify(st));
-    } catch(e) {}
+    var m=rawInput.match(/^([a-zA-Z]+),\s*(.*)$/);
+    if(!m) return 'Usage: FlairText(flair, hover text)';
+    var tier=m[1].trim().toLowerCase(), tooltip=m[2].trim();
+    if(!FLAIR_DISPLAY[tier]) return 'Error: unknown tier "'+tier+'".';
+    var existing=FLAIR_COLOR_OVERRIDES[tier]||{};
+    FLAIR_COLOR_OVERRIDES[tier]={color:existing.color||'',tooltip:tooltip};
+    try{var st=JSON.parse(localStorage.getItem('airdriftFlairColors')||'{}');var stored=st[tier]||{};st[tier]={color:stored.color||'',tooltip:tooltip};localStorage.setItem('airdriftFlairColors',JSON.stringify(st));}catch(e){}
     renderComments();
-    return 'Done. ' + FLAIR_DISPLAY[tier].label + ' hover text set to: "' + tooltip + '".';
+    return 'Done. '+FLAIR_DISPLAY[tier].label+' hover text: "'+tooltip+'".';
   }
 
   function adminFlairColor(rawInput) {
@@ -5955,21 +5773,6 @@ var allComments  = [];
     try { return localStorage.getItem('airdriftBio:' + email) || ''; } catch(e) { return ''; }
   }
 
-  function pcSetHoverText(sel) {
-    if (!currentUser) return;
-    var text = sel.value;
-    // Update the user's flair color-by-user entry — preserve color, update tooltip
-    var existing = FLAIR_COLOR_BY_USER[currentUser.email] || {};
-    var updated = { color: existing.color || '', tooltip: text };
-    FLAIR_COLOR_BY_USER[currentUser.email] = updated;
-    try {
-      var cu = JSON.parse(localStorage.getItem('airdriftFlairColorByUser') || '{}');
-      cu[currentUser.email] = updated;
-      localStorage.setItem('airdriftFlairColorByUser', JSON.stringify(cu));
-    } catch(e) {}
-    renderComments();
-  }
-
   function pcBioCounter(ta) {
     var el = document.getElementById('pc-bio-chars');
     if (el) el.textContent = ta.value.length + '/160';
@@ -6033,37 +5836,27 @@ var allComments  = [];
   }
 
   function renderReactionsBar(itemId) {
-    var data      = getReactions(itemId);
-    var myEmail   = currentUser ? currentUser.email : null;
-    var tier      = myEmail ? getUserTier(myEmail) : null;
-    var canReact  = myEmail && (myEmail === MODERATOR_EMAIL || (tier && REACTION_TIERS.indexOf(tier) !== -1));
-    var isSignedOut  = !myEmail;
-    // Click action for locked users -- prompt sign-in or upgrade
-    var lockedAction = isSignedOut
-      ? 'showSignInModal(\'Sign in to react to comments.\')'
-      : 'showUpgradeModal(\'Reactions require a Supporter flair or above.\')';
-    var pills = '';
+    var data    = getReactions(itemId);
+    var myEmail = currentUser ? currentUser.email : null;
+    var tier    = myEmail ? getUserTier(myEmail) : null;
+    var canReact= myEmail && (myEmail === MODERATOR_EMAIL || (tier && REACTION_TIERS.indexOf(tier) !== -1));
+    var pills   = '';
     REACTIONS_AVAILABLE.forEach(function(emoji) {
       var users = data[emoji] || [];
       if (users.length === 0) return;
       var reacted = myEmail && users.indexOf(myEmail) !== -1;
-      if (canReact) {
-        pills += '<button class="reaction-btn' + (reacted ? ' reacted' : '') + '"' +
-          ' onclick="toggleReaction(\'' + itemId + '\',\'' + emoji + '\')">' +
-          emoji + ' <span class="reaction-count">' + users.length + '</span></button>';
-      } else {
-        pills += '<button class="reaction-btn" onclick="' + lockedAction + '" style="opacity:0.6;">' +
-          emoji + ' <span class="reaction-count">' + users.length + '</span></button>';
-      }
+      pills += '<button class="reaction-btn' + (reacted ? ' reacted' : '') + '"' +
+        ' onclick="toggleReaction(\'' + itemId + '\',\'' + emoji + '\')"' +
+        (canReact ? '' : ' disabled style="cursor:default;"') + '>' +
+        emoji + ' <span class="reaction-count">' + users.length + '</span>' +
+      '</button>';
     });
-    // Always show + button — locked users get prompted to sign in or upgrade
     var addBtn = canReact
       ? '<button class="reaction-add-btn" onclick="showReactionPicker(this,\'' + itemId + '\')" title="React">+</button>'
-      : '<button class="reaction-add-btn" onclick="' + lockedAction + '" style="opacity:0.5;" title="React">+</button>';
-    if (!pills && !canReact) return addBtn;
+      : '';
+    if (!pills && !addBtn) return '';
     return '<span class="reactions-inline" data-item-id="' + itemId + '">' + pills + addBtn + '</span>';
   }
-
 
   function toggleReaction(itemId, emoji) {
     if (!currentUser) { showSignInModal('Sign in to react to comments.'); return; }
@@ -6080,10 +5873,10 @@ var allComments  = [];
     if (users.length === 0) delete data[emoji];
     else data[emoji] = users;
     saveReactions(itemId, data);
-    // Re-render just the reactions inline span
     document.querySelectorAll('.reactions-inline[data-item-id="' + itemId + '"]').forEach(function(el) {
       el.outerHTML = renderReactionsBar(itemId);
     });
+    sendReactionNotification(itemId, data);
     // Pulse the toggled emoji button
     setTimeout(function() {
       document.querySelectorAll('.reactions-inline[data-item-id="' + itemId + '"] .reaction-btn').forEach(function(btn) {
@@ -6093,8 +5886,6 @@ var allComments  = [];
         }
       });
     }, 10);
-    // Send reaction notification to comment/reply author
-    sendReactionNotification(itemId, data);
   }
 
   function showReactionPicker(btn, itemId) {
@@ -6237,18 +6028,11 @@ var allComments  = [];
       var isSelected = btn.getAttribute('data-color') === color;
       btn.style.border = '2px solid ' + (isSelected ? '#fff' : 'transparent');
     });
-    // Update profile card name color live
     var pcNameSpan = document.querySelector('#profile-card .pc-name span');
-    if (pcNameSpan) {
-      pcNameSpan.style.color = color || '';
-      pcNameSpan.style.webkitTextFillColor = color || '';
-    }
-    // Also update all comment/reply name spans in the current view
-    document.querySelectorAll('[data-email="' + currentUser.email + '"]').forEach(function(el) {
-      if (el.classList.contains('comment-name') || el.classList.contains('reply-name')) {
-        el.style.color = color || '';
-        el.style.webkitTextFillColor = color || '';
-      }
+    if (pcNameSpan) { pcNameSpan.style.color=color||''; pcNameSpan.style.webkitTextFillColor=color||''; }
+    document.querySelectorAll('[data-email="'+currentUser.email+'"]').forEach(function(el){
+      if(el.classList.contains('comment-name')||el.classList.contains('reply-name')){
+        el.style.color=color||''; el.style.webkitTextFillColor=color||''; }
     });
   }
 
@@ -6386,112 +6170,48 @@ var allComments  = [];
 
 
   // ── COMMAND PANEL ───────────────────────────────────
-  // ── HOVER TEXT PICKER OPTIONS ────────────────────────
-  var HOVER_OPTIONS_KEY = 'airdriftHoverOptions';
-  var HOVER_TIERS_KEY   = 'airdriftHoverTiers';
-  var HOVER_COUNT_KEY   = 'airdriftHoverCount';
-
-  // Which tiers can use the hover text picker (default: subscriber and up)
-  var HOVER_PICKER_TIERS = ['subscriber','member','collector','artist','writer'];
-
-  // Max options per tier (default: 5)
-  var HOVER_MAX_COUNT = {};
-
-  // Predefined options per tier: { tier: ['option1', ...] }
-  var HOVER_OPTIONS = {};
-
-  // Load saved hover data
-  (function() {
-    try {
-      var o = JSON.parse(localStorage.getItem(HOVER_OPTIONS_KEY) || '{}');
-      Object.keys(o).forEach(function(k) { HOVER_OPTIONS[k] = o[k]; });
-    } catch(e) {}
-    try {
-      var t = JSON.parse(localStorage.getItem(HOVER_TIERS_KEY) || '[]');
-      if (t.length) HOVER_PICKER_TIERS = t;
-    } catch(e) {}
-    try {
-      var c = JSON.parse(localStorage.getItem(HOVER_COUNT_KEY) || '{}');
-      Object.keys(c).forEach(function(k) { HOVER_MAX_COUNT[k] = c[k]; });
-    } catch(e) {}
-  })();
-
-  function saveHoverOptions() {
-    try { localStorage.setItem(HOVER_OPTIONS_KEY, JSON.stringify(HOVER_OPTIONS)); } catch(e) {}
-  }
-
-  function adminHoverAdd(rawInput) {
-    var m = rawInput.match(/^([a-zA-Z]+),\s*(.+)$/);
-    if (!m) return 'Usage: HoverAdd(flair, option text)';
-    var tier   = m[1].trim().toLowerCase();
-    var option = m[2].trim();
-    if (!FLAIR_DISPLAY[tier]) return 'Error: unknown flair tier "' + tier + '".';
-    if (!HOVER_OPTIONS[tier]) HOVER_OPTIONS[tier] = [];
-    var max = HOVER_MAX_COUNT[tier] || 5;
-    if (HOVER_OPTIONS[tier].length >= max) return 'Error: max ' + max + ' options for ' + tier + '. Use HoverCount to increase or HoverRemove to free a slot.';
-    if (HOVER_OPTIONS[tier].indexOf(option) !== -1) return 'Error: that option already exists for ' + tier + '.';
-    HOVER_OPTIONS[tier].push(option);
-    saveHoverOptions();
-    return 'Done. Added to ' + FLAIR_DISPLAY[tier].label + ': "' + option + '" (' + HOVER_OPTIONS[tier].length + '/' + max + ' slots used).';
-  }
-
-  function adminHoverRemove(rawInput) {
-    var m = rawInput.match(/^([a-zA-Z]+),\s*(.+)$/);
-    if (!m) return 'Usage: HoverRemove(flair, option text)';
-    var tier   = m[1].trim().toLowerCase();
-    var option = m[2].trim();
-    if (!FLAIR_DISPLAY[tier]) return 'Error: unknown flair tier "' + tier + '".';
-    if (!HOVER_OPTIONS[tier] || HOVER_OPTIONS[tier].length === 0) return 'Error: no options set for ' + tier + '.';
-    var idx = HOVER_OPTIONS[tier].indexOf(option);
-    if (idx === -1) return 'Error: option "' + option + '" not found for ' + tier + '.';
-    HOVER_OPTIONS[tier].splice(idx, 1);
-    saveHoverOptions();
-    return 'Done. Removed from ' + FLAIR_DISPLAY[tier].label + ': "' + option + '".';
-  }
-
-  function adminHoverTiers(rawInput) {
-    // HoverTiers(subscriber, member, collector) -- sets which tiers see the picker
-    var tiers = rawInput.split(',').map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
-    var valid  = ['newcomer','supporter','subscriber','member','collector','artist','writer'];
-    var bad    = tiers.filter(function(t) { return valid.indexOf(t) === -1; });
-    if (bad.length) return 'Error: unknown tier(s): ' + bad.join(', ');
-    HOVER_PICKER_TIERS = tiers;
-    try { localStorage.setItem(HOVER_TIERS_KEY, JSON.stringify(tiers)); } catch(e) {}
-    return 'Done. Hover text picker available to: ' + tiers.join(', ') + '.';
-  }
-
-  function adminHoverCount(rawInput) {
-    // HoverCount(flair, n) -- sets max options for a tier
-    var m = rawInput.match(/^([a-zA-Z]+),\s*(\d+)$/);
-    if (!m) return 'Usage: HoverCount(flair, number)';
-    var tier = m[1].trim().toLowerCase();
-    var n    = parseInt(m[2]);
-    if (!FLAIR_DISPLAY[tier]) return 'Error: unknown flair tier "' + tier + '".';
-    if (n < 1 || n > 20) return 'Error: count must be between 1 and 20.';
-    HOVER_MAX_COUNT[tier] = n;
-    try {
-      var c = JSON.parse(localStorage.getItem(HOVER_COUNT_KEY) || '{}');
-      c[tier] = n; localStorage.setItem(HOVER_COUNT_KEY, JSON.stringify(c));
-    } catch(e) {}
-    return 'Done. ' + FLAIR_DISPLAY[tier].label + ' max hover options set to ' + n + '.';
-  }
-
-  function adminHoverList(rawInput) {
-    // HoverList(flair) -- shows current options for a tier
-    var tier = rawInput.trim().toLowerCase();
-    if (!FLAIR_DISPLAY[tier]) return 'Error: unknown flair tier "' + tier + '".';
-    var opts = HOVER_OPTIONS[tier] || [];
-    var max  = HOVER_MAX_COUNT[tier] || 5;
-    if (opts.length === 0) return FLAIR_DISPLAY[tier].label + ' has no hover options set.';
-    return FLAIR_DISPLAY[tier].label + ' (' + opts.length + '/' + max + '): ' + opts.map(function(o,i){return (i+1)+'. '+o;}).join(' | ');
-  }
+  var HOVER_OPTIONS_KEY='airdriftHoverOptions',HOVER_TIERS_KEY='airdriftHoverTiers',HOVER_COUNT_KEY='airdriftHoverCount';
+  var HOVER_PICKER_TIERS=['subscriber','member','collector','artist','writer'];
+  var HOVER_MAX_COUNT={},HOVER_OPTIONS={};
+  (function(){try{var o=JSON.parse(localStorage.getItem(HOVER_OPTIONS_KEY)||'{}');Object.keys(o).forEach(function(k){HOVER_OPTIONS[k]=o[k];});}catch(e){}
+    try{var t=JSON.parse(localStorage.getItem(HOVER_TIERS_KEY)||'[]');if(t.length)HOVER_PICKER_TIERS=t;}catch(e){}
+    try{var c=JSON.parse(localStorage.getItem(HOVER_COUNT_KEY)||'{}');Object.keys(c).forEach(function(k){HOVER_MAX_COUNT[k]=c[k];});}catch(e){}})();
+  function saveHoverOptions(){try{localStorage.setItem(HOVER_OPTIONS_KEY,JSON.stringify(HOVER_OPTIONS));}catch(e){}}
+  function adminHoverAdd(r){var m=r.match(/^([a-zA-Z]+),\s*(.+)$/);if(!m)return 'Usage: HoverAdd(flair, text)';
+    var tier=m[1].trim().toLowerCase(),opt=m[2].trim();if(!FLAIR_DISPLAY[tier])return 'Error: unknown tier.';
+    if(!HOVER_OPTIONS[tier])HOVER_OPTIONS[tier]=[];var max=HOVER_MAX_COUNT[tier]||5;
+    if(HOVER_OPTIONS[tier].length>=max)return 'Error: max '+max+' options.';
+    if(HOVER_OPTIONS[tier].indexOf(opt)!==-1)return 'Error: already exists.';
+    HOVER_OPTIONS[tier].push(opt);saveHoverOptions();return 'Done. Added: "'+opt+'" ('+HOVER_OPTIONS[tier].length+'/'+max+')';}
+  function adminHoverRemove(r){var m=r.match(/^([a-zA-Z]+),\s*(.+)$/);if(!m)return 'Usage: HoverRemove(flair, text)';
+    var tier=m[1].trim().toLowerCase(),opt=m[2].trim();if(!FLAIR_DISPLAY[tier])return 'Error: unknown tier.';
+    if(!HOVER_OPTIONS[tier]||!HOVER_OPTIONS[tier].length)return 'Error: no options for '+tier+'.';
+    var idx=HOVER_OPTIONS[tier].indexOf(opt);if(idx===-1)return 'Error: not found.';
+    HOVER_OPTIONS[tier].splice(idx,1);saveHoverOptions();return 'Done. Removed: "'+opt+'"';}
+  function adminHoverTiers(r){var tiers=r.split(',').map(function(s){return s.trim().toLowerCase();}).filter(Boolean);
+    var valid=['newcomer','supporter','subscriber','member','collector','artist','writer'];
+    var bad=tiers.filter(function(t){return valid.indexOf(t)===-1;});if(bad.length)return 'Error: '+bad.join(', ');
+    HOVER_PICKER_TIERS=tiers;try{localStorage.setItem(HOVER_TIERS_KEY,JSON.stringify(tiers));}catch(e){}
+    return 'Done. Picker to: '+tiers.join(', ');}
+  function adminHoverCount(r){var m=r.match(/^([a-zA-Z]+),\s*(\d+)$/);if(!m)return 'Usage: HoverCount(flair, n)';
+    var tier=m[1].trim().toLowerCase(),n=parseInt(m[2]);if(!FLAIR_DISPLAY[tier])return 'Error: unknown tier.';
+    if(n<1||n>20)return 'Error: 1-20 only.';HOVER_MAX_COUNT[tier]=n;
+    try{var c=JSON.parse(localStorage.getItem(HOVER_COUNT_KEY)||'{}');c[tier]=n;localStorage.setItem(HOVER_COUNT_KEY,JSON.stringify(c));}catch(e){}
+    return 'Done. '+FLAIR_DISPLAY[tier].label+' max: '+n;}
+  function adminHoverList(r){var tier=r.trim().toLowerCase();if(!FLAIR_DISPLAY[tier])return 'Error: unknown tier.';
+    var opts=HOVER_OPTIONS[tier]||[],max=HOVER_MAX_COUNT[tier]||5;if(!opts.length)return FLAIR_DISPLAY[tier].label+' has no options.';
+    return FLAIR_DISPLAY[tier].label+' ('+opts.length+'/'+max+'): '+opts.map(function(o,i){return(i+1)+'. '+o;}).join(' | ');}
+  function pcSetHoverText(sel){if(!currentUser)return;
+    var text=sel.value,existing=FLAIR_COLOR_BY_USER[currentUser.email]||{},updated={color:existing.color||'',tooltip:text};
+    FLAIR_COLOR_BY_USER[currentUser.email]=updated;
+    try{var cu=JSON.parse(localStorage.getItem('airdriftFlairColorByUser')||'{}');cu[currentUser.email]=updated;localStorage.setItem('airdriftFlairColorByUser',JSON.stringify(cu));}catch(e){}
+    renderComments();}
 
   var CMD_DEFS = {
     AssignMod:      { args: ['Username'] },
     RemoveMod:      { args: ['Username'] },
     FlairCode:      { args: ['Flair', 'Code'], tierSelect: true },
-    FlairColor:     { args: ['#Color', 'Hover Text (optional)'], tierSelect: true },
-    FlairText:      { args: ['Hover Text'], tierSelect: true },
+    FlairColor:     { args: ['Flair', '#Color', 'Hover Text (optional)'] },
     FlairTime:      { args: ['Username', 'Months', 'Days'] },
     BanUser:        { args: ['Username'] },
     ReinstateUser:  { args: ['Username'] },
@@ -6503,11 +6223,6 @@ var allComments  = [];
     BannedUsers:    { args: [], optional: true },
     RestrictPage:   { args: ['URL Slug', 'Flair1, Flair2, ...'] },
     UnrestrictPage: { args: ['URL Slug'] },
-    HoverAdd:       { args: ['Option Text'], tierSelect: true },
-    HoverRemove:    { args: ['Option Text'], tierSelect: true },
-    HoverTiers:     { args: ['Tier1, Tier2, ...'] },
-    HoverCount:     { args: ['Max Count'], tierSelect: true },
-    HoverList:      { args: [], tierSelect: true },
   };
 
   function cmdSelectChange() {
@@ -6516,111 +6231,101 @@ var allComments  = [];
     var tierEl = document.getElementById('flair-admin-tier');
     var scopeEl= document.getElementById('flair-admin-scope');
     var typeEl = document.getElementById('flair-admin-type');
+    var wrap   = document.getElementById('cmd-args-wrap');
+    var fields = document.getElementById('cmd-args-fields');
     var subBtn = document.getElementById('cmd-submit-btn');
     var canBtn = document.getElementById('cmd-cancel-btn');
     var ta     = document.getElementById('flair-admin-email');
 
-    // Hide assign-flair-specific dropdowns
+    // Hide everything first
     [tierEl, scopeEl, typeEl].forEach(function(el) { if (el) el.style.display = 'none'; });
+    wrap.style.display = 'none';
     subBtn.style.display = 'none';
     canBtn.style.display = 'none';
-
-    // Remove any previously built arg fields
-    var existing = document.getElementById('cmd-dynamic-fields');
-    if (existing) existing.remove();
-
-    if (!cmd) {
-      if (ta) ta.placeholder = 'Username, email, or arguments...';
-      return;
-    }
+    fields.innerHTML = '';
+    if (!cmd) return;
 
     if (cmd === 'AssignFlair') {
+      // Show flair dropdowns -- Assign button is Submit
       if (tierEl)  tierEl.style.display  = 'inline-block';
       if (scopeEl) scopeEl.style.display = 'inline-block';
       subBtn.textContent = 'Assign';
       subBtn.style.display = 'inline-block';
       canBtn.style.display = 'inline-block';
       if (ta) ta.placeholder = 'Username or email...';
-      return;
-    }
-
-    var def = CMD_DEFS[cmd];
-    if (!def) return;
-
-    // Build a fresh container and insert it into the command row
-    var container = document.createElement('div');
-    container.id = 'cmd-dynamic-fields';
-    container.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;width:100%;';
-
-    if (def.tierSelect) {
-      // Flair tier dropdown
-      var tierDrop = document.createElement('select');
-      tierDrop.className = 'flair-admin-select';
-      tierDrop.setAttribute('data-role', 'tier-select');
-      tierDrop.style.cssText = 'display:inline-block;';
-      [
-        {val:'', label:'-- Flair --'},
-        {val:'newcomer',  label:'Drifter'},
-        {val:'supporter', label:'Supporter'},
-        {val:'subscriber',label:'Subscriber'},
-        {val:'member',    label:'Member'},
-        {val:'collector', label:'Collector'},
-        {val:'artist',    label:'Featured Artist'},
-        {val:'writer',    label:'Featured Writer'},
-      ].forEach(function(t) {
-        var o = document.createElement('option');
-        o.value = t.val; o.textContent = t.label;
-        tierDrop.appendChild(o);
-      });
-      container.appendChild(tierDrop);
-    }
-
-    // Arg input fields
-    def.args.forEach(function(placeholder, idx) {
-      var inp = document.createElement('input');
-      inp.type = 'text';
-      inp.placeholder = placeholder;
-      inp.className = 'flair-admin-input';
-      inp.style.cssText = 'width:160px;display:inline-block;';
-      inp.setAttribute('data-arg-idx', idx);
-      inp.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          var next = container.querySelector('[data-arg-idx="' + (idx + 1) + '"]');
-          if (next) next.focus(); else cmdSubmit();
-        } else if (e.key === 'Enter') { cmdSubmit(); }
-      });
-      container.appendChild(inp);
-    });
-
-    if (def.optional) {
-      if (ta) ta.placeholder = 'Username or email (optional, leave blank for all)';
-    } else if (ta) {
-      ta.placeholder = 'Or type full command here instead...';
-    }
-
-    // Insert container after the cmd-select row div
-    var cmdRow = sel.closest ? sel.closest('div') : sel.parentNode;
-    if (cmdRow) {
-      cmdRow.appendChild(container);
-    }
-
-    subBtn.textContent = 'Submit';
-    subBtn.style.display = 'inline-block';
-    canBtn.style.display = 'inline-block';
-
-    // Focus first input or tier dropdown
-    setTimeout(function() {
-      var first = container.querySelector('input');
-      if (first) first.focus();
-      else {
-        var drop = container.querySelector('select');
-        if (drop) drop.focus();
+    } else {
+      // Show argument input fields
+      var def = CMD_DEFS[cmd];
+      if (ta) ta.placeholder = def && def.args.length ? def.args.join(', ') + '...' : 'No arguments needed';
+      if (def && def.tierSelect) {
+        // FlairCode: show tier dropdown + code input
+        var sel2 = document.createElement('select');
+        sel2.className = 'flair-admin-select';
+        sel2.setAttribute('data-idx', '0');
+        sel2.setAttribute('data-role', 'tier-select');
+        var tierOpts = [
+          {val:'newcomer',  label:'Drifter'},
+          {val:'supporter', label:'Supporter'},
+          {val:'subscriber',label:'Subscriber'},
+          {val:'member',    label:'Member'},
+          {val:'collector', label:'Collector'},
+          {val:'artist',    label:'Featured Artist'},
+          {val:'writer',    label:'Featured Writer'},
+        ];
+        var defOpt = document.createElement('option');
+        defOpt.value = ''; defOpt.textContent = '-- Select Flair --';
+        sel2.appendChild(defOpt);
+        tierOpts.forEach(function(t) {
+          var o = document.createElement('option');
+          o.value = t.val; o.textContent = t.label;
+          sel2.appendChild(o);
+        });
+        var codeInp = document.createElement('input');
+        codeInp.type = 'text';
+        codeInp.placeholder = 'New code';
+        codeInp.className = 'flair-admin-input';
+        codeInp.style.cssText = 'width:140px;display:inline-block;';
+        codeInp.setAttribute('data-idx', '1');
+        codeInp.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') cmdSubmit();
+        });
+        fields.appendChild(sel2);
+        fields.appendChild(codeInp);
+        wrap.style.display = 'flex';
+        setTimeout(function() { codeInp.focus(); }, 50);
+      } else if (def && def.args.length > 0) {
+        def.args.forEach(function(placeholder, idx) {
+          var inp = document.createElement('input');
+          inp.type = 'text';
+          inp.placeholder = placeholder;
+          inp.className = 'flair-admin-input';
+          inp.style.cssText = 'width:140px;display:inline-block;';
+          inp.setAttribute('data-idx', idx);
+          inp.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab' || e.key === ',') {
+              e.preventDefault();
+              var next = fields.querySelector('[data-idx="' + (idx + 1) + '"]');
+              if (next) next.focus();
+              else cmdSubmit();
+            } else if (e.key === 'Enter') {
+              cmdSubmit();
+            }
+          });
+          fields.appendChild(inp);
+        });
+        wrap.style.display = 'flex';
+        setTimeout(function() { var f = fields.querySelector('input'); if (f) f.focus(); }, 50);
+      } else if (def && def.optional) {
+        // No required args -- textarea is optional filter. Show a hint.
+        if (ta) ta.placeholder = 'Username or email (optional -- leave blank for all)';
       }
-    }, 50);
+      subBtn.textContent = 'Submit';
+      subBtn.style.display = 'inline-block';
+      canBtn.style.display = 'inline-block';
+    }
   }
 
-    var cmdSubmit = function() {
+  function cmdSubmit() {
     var sel = document.getElementById('cmd-select');
     var cmd = sel.value;
     if (!cmd) return;
@@ -6637,13 +6342,10 @@ var allComments  = [];
         raw = filter ? cmd + '(' + filter + ')' : cmd + '()';
       } else {
         var args = [];
-        // Read from dynamic fields container
-        var dynFields = document.getElementById('cmd-dynamic-fields');
-        if (dynFields) {
-          var tierSel = dynFields.querySelector('[data-role="tier-select"]');
-          if (tierSel) args.push(tierSel.value);
-          dynFields.querySelectorAll('input').forEach(function(inp) { args.push(inp.value.trim()); });
-        }
+        // Read tier dropdown if present
+        var tierSel = fields.querySelector('[data-role="tier-select"]');
+        if (tierSel) args.push(tierSel.value);
+        fields.querySelectorAll('input').forEach(function(inp) { args.push(inp.value.trim()); });
         // If arg fields are gone or empty, try parsing the textarea directly
         // Allows typing args comma-separated without parentheses
         var taVal = ta ? ta.value.trim() : '';
@@ -6689,9 +6391,9 @@ var allComments  = [];
     canBtn.style.display = 'none';
     [tierEl, scopeEl, typeEl].forEach(function(el) { if (el) el.style.display = 'none'; });
     if (status) status.textContent = '';
-    var dynFields = document.getElementById('cmd-dynamic-fields');
-    if (dynFields) dynFields.remove();
-    if (ta) { ta.value = ''; ta.placeholder = 'Username, email, or arguments...'; }
+    var fields = document.getElementById('cmd-args-fields');
+    if (fields) fields.innerHTML = '';
+    if (ta) { ta.value = ''; ta.placeholder = 'Username or email...'; }
   }
 
   // ── FILTERED VIEW USERS ──────────────────────────────

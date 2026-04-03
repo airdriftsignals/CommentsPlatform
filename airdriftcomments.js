@@ -1,6 +1,6 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-03 22:11
+// Build: 2026-04-03 22:58
 
 // Load Google Fonts
 (function(){if(document.getElementById('airdrift-gfonts'))return;
@@ -313,36 +313,59 @@ var allComments  = [];
   }
 
   // Google Sign-In
+  // DEV SIGN-IN (Google disabled for testing)
   function signInWithGoogle() {
-    if (googleSignInInProgress) return;
-    if (!window.google || !window.google.accounts) {
-      alert('Google Sign-In is still loading. Please try again in a moment.');
-      return;
-    }
-    googleSignInInProgress = true;
-    try {
-      google.accounts.id.cancel();
-      google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleGoogleSignInResponse,
-        ux_mode: 'popup',
-        auto_select: false
-      });
-      google.accounts.id.prompt(function(notification) {
-        googleSignInInProgress = false;
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          // Prompt was dismissed -- fall back to renderButton
-          google.accounts.id.renderButton(
-            document.getElementById('google-signin-btn'),
-            { theme: 'filled_black', size: 'large', text: 'signin_with', shape: 'rectangular', width: 220 }
-          );
-        }
-      });
-    } catch(e) {
-      googleSignInInProgress = false;
-      console.error('Google Sign-In error:', e);
-      alert('Error signing in. Please try again.');
-    }
+    // Show a simple email/name sign-in modal for testing
+    var existing = document.getElementById('dev-signin-modal');
+    if (existing) existing.remove();
+    var div = document.createElement('div');
+    div.id = 'dev-signin-modal';
+    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    div.innerHTML =
+      '<div style="background:#111;border:1px solid #2a5f7f;border-radius:12px;padding:28px;max-width:360px;width:100%;text-align:center;">' +
+        '<div style="font-size:28px;margin-bottom:12px;">&#x1F511;</div>' +
+        '<div style="font-size:15px;font-weight:700;color:#b89f37;margin-bottom:6px;">Sign In (Dev Mode)</div>' +
+        '<div style="font-size:11px;color:#555;margin-bottom:16px;">Google sign-in temporarily disabled for testing.</div>' +
+        '<input id="dev-email" type="email" placeholder="Email address" style="width:100%;box-sizing:border-box;background:#0a0a0a;border:1px solid #2a5f7f;color:#aaa;padding:9px 12px;border-radius:6px;font-size:13px;font-family:inherit;outline:none;margin-bottom:10px;" />' +
+        '<input id="dev-name" type="text" placeholder="Display name" style="width:100%;box-sizing:border-box;background:#0a0a0a;border:1px solid #2a5f7f;color:#aaa;padding:9px 12px;border-radius:6px;font-size:13px;font-family:inherit;outline:none;margin-bottom:16px;" />' +
+        '<div style="display:flex;gap:10px;justify-content:center;">' +
+          '<button onclick="devSignIn()" style="background:linear-gradient(135deg,#2a5f7f,#1a3f5f);color:#b89f37;border:none;padding:9px 28px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Sign In</button>' +
+          '<button onclick="document.getElementById(\'dev-signin-modal\').remove()" style="background:none;border:1px solid #333;color:#888;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit;">Cancel</button>' +
+        '</div>' +
+      '</div>';
+    div.addEventListener('click', function(e) { if (e.target === div) div.remove(); });
+    document.body.appendChild(div);
+    setTimeout(function() { var el = document.getElementById('dev-email'); if (el) el.focus(); }, 100);
+  }
+
+  function devSignIn() {
+    var emailEl = document.getElementById('dev-email');
+    var nameEl  = document.getElementById('dev-name');
+    if (!emailEl || !nameEl) return;
+    var email = emailEl.value.trim().toLowerCase();
+    var name  = nameEl.value.trim();
+    if (!email || email.indexOf('@') === -1) { emailEl.style.borderColor = '#FF6B35'; return; }
+    if (!name) { name = email.split('@')[0]; }
+    var modal = document.getElementById('dev-signin-modal');
+    if (modal) modal.remove();
+    loadUsernames();
+    var chosenName = usernameMap[email] || name;
+    currentUser = { name: chosenName, email: email, provider: 'dev' };
+    dismissWelcomeModal();
+    sessionStorage.setItem('airdriftCurrentUser', JSON.stringify(currentUser));
+    localStorage.setItem('airdriftCurrentUser', JSON.stringify(currentUser));
+    updateUI();
+    loadRateTimestamps();
+    showSignedInToast(true);
+    loadNotifications();
+    checkPendingFlairModals();
+    updateSubscribeBtn();
+    renderComments();
+    scanForNotifications();
+    scanForMentionNotifications();
+    startNotifPolling();
+    startTypingPoll();
+    if (!usernameMap[email + '_seen']) showUsernameModal(name);
   }
 
   function handleGoogleSignInResponse(response) {

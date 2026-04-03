@@ -1,8 +1,6 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-03 20:14
-
-try {
+// Build: 2026-04-03 20:26
 
 // Load Google Fonts for community rank labels
 (function() {
@@ -331,100 +329,86 @@ updateUI();
 }
 
 // Google Sign-In
-// Initialize Google Sign-In once GSI library is ready
-// Renders a real Google button so mobile browsers never block it
-// Mobile debug helper — remove after debugging
-function mobileDebug(msg) {
-var el = document.getElementById(‘mobile-debug-bar’);
-if (!el) {
-el = document.createElement(‘div’);
-el.id = ‘mobile-debug-bar’;
-el.style.cssText = ‘position:fixed;bottom:0;left:0;right:0;background:#c00;color:#fff;font-size:11px;padding:6px 10px;z-index:999999;word-break:break-all;’;
-document.body.appendChild(el);
-}
-el.textContent = msg;
-}
-
+// Initialize Google Sign-In — uses HTML data-attribute approach for ITP/mobile compatibility
 function initGoogleSignIn() {
 if (!window.google || !window.google.accounts) return;
 google.accounts.id.initialize({
 client_id: GOOGLE_CLIENT_ID,
 callback: handleGoogleSignInResponse,
 auto_select: false,
-cancel_on_tap_outside: true
+itp_support: true,
+use_fedcm_for_prompt: false
 });
-// Render the button into the sign-in form button slot
+// Render the official Google button — works on all browsers including mobile Safari
 var btnEl = document.getElementById(‘google-signin-btn’);
 if (btnEl) {
-google.accounts.id.renderButton(btnEl,
-{ theme: ‘filled_black’, size: ‘large’, text: ‘signin_with’, shape: ‘rectangular’, width: 240 }
-);
+btnEl.innerHTML = ‘’;
+google.accounts.id.renderButton(btnEl, {
+theme: ‘filled_black’,
+size: ‘large’,
+text: ‘signin_with’,
+shape: ‘rectangular’,
+width: Math.min(280, window.innerWidth - 40)
+});
 }
 }
 
-// Called by all sign-in buttons in the UI
-// On mobile: shows the pre-rendered Google button area
-// On desktop: triggers One Tap prompt as well
+// Called by all sign-in buttons — ensures Google button is rendered and visible
 function signInWithGoogle() {
 if (!window.google || !window.google.accounts) {
 alert(‘Google Sign-In is still loading. Please try again in a moment.’);
 return;
 }
-mobileDebug(‘signInWithGoogle called, google=’ + (!!window.google) + ’ accounts=’ + (window.google && !!window.google.accounts));
-// Make sure button is rendered
 initGoogleSignIn();
-// Show the sign-in form if it is hidden
+// Show the comment form / sign-in area
 var form = document.getElementById(‘comment-form-guest’);
 if (form) form.style.display = ‘block’;
-// Scroll to the sign-in button so user can tap it
+// Scroll to the Google button
 var btnEl = document.getElementById(‘google-signin-btn’);
-if (btnEl) {
-btnEl.scrollIntoView({ behavior: ‘smooth’, block: ‘center’ });
-}
-// Also try One Tap for desktop (silently ignored on mobile)
-try {
-google.accounts.id.prompt(function(notification) {});
-} catch(e) {}
+if (btnEl) btnEl.scrollIntoView({ behavior: ‘smooth’, block: ‘center’ });
 }
 
+```
 function handleGoogleSignInResponse(response) {
 if (response.credential) {
-try {
-var base64Url = response.credential.split(’.’)[1];
-var base64 = base64Url.replace(/-/g, ‘+’).replace(/_/g, ‘/’);
-var jsonPayload = decodeURIComponent(atob(base64).split(’’).map(function(c) {
-return ‘%’ + (‘00’ + c.charCodeAt(0).toString(16)).slice(-2);
-}).join(’’));
-var decoded = JSON.parse(jsonPayload);
-var googleName = decoded.name;
-loadUsernames();
-var chosenName = usernameMap[decoded.email] || googleName;
-currentUser = { name: chosenName, email: decoded.email, provider: ‘google’ };
-dismissWelcomeModal();
-sessionStorage.setItem(‘airdriftCurrentUser’, JSON.stringify(currentUser));
-localStorage.setItem(‘airdriftCurrentUser’, JSON.stringify(currentUser));
-updateUI();
-loadRateTimestamps();
-showSignedInToast(true); // force show on fresh sign-in
-loadNotifications();
-scanForNotifications();
-scanForMentionNotifications();
-startNotifPolling();
-var warnCount=localStorage.getItem(‘airdriftWarn:’+decoded.email);
-if(warnCount){localStorage.removeItem(‘airdriftWarn:’+decoded.email);
-setTimeout(function(){alert(‘You have received a warning from the moderator. You now have ‘+warnCount+’ warning’+(parseInt(warnCount)>1?‘s’:’’)+’. ’);},1000);}
-var reinstated=localStorage.getItem(‘airdriftReinstate:’+decoded.email);
-if(reinstated){localStorage.removeItem(‘airdriftReinstate:’+decoded.email);
-setTimeout(function(){alert(‘Your account has been reinstated. Welcome back!’);},1000);}
+  try {
+    var base64Url = response.credential.split('.')[1];
+    var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    var jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    var decoded = JSON.parse(jsonPayload);
+    var googleName = decoded.name;
+    loadUsernames();
+    var chosenName = usernameMap[decoded.email] || googleName;
+    currentUser = { name: chosenName, email: decoded.email, provider: 'google' };
+    dismissWelcomeModal();
+    sessionStorage.setItem('airdriftCurrentUser', JSON.stringify(currentUser));
+    localStorage.setItem('airdriftCurrentUser', JSON.stringify(currentUser));
+    updateUI();
+    loadRateTimestamps();
+    showSignedInToast(true); // force show on fresh sign-in
+    loadNotifications();
+    scanForNotifications();
+    scanForMentionNotifications();
+    startNotifPolling();
+    var warnCount=localStorage.getItem('airdriftWarn:'+decoded.email);
+    if(warnCount){localStorage.removeItem('airdriftWarn:'+decoded.email);
+      setTimeout(function(){alert('You have received a warning from the moderator. You now have '+warnCount+' warning'+(parseInt(warnCount)>1?'s':'')+'. ');},1000);}
+    var reinstated=localStorage.getItem('airdriftReinstate:'+decoded.email);
+    if(reinstated){localStorage.removeItem('airdriftReinstate:'+decoded.email);
+      setTimeout(function(){alert('Your account has been reinstated. Welcome back!');},1000);}
 startTypingPoll();
-// Show username modal only if never seen before
-if (!usernameMap[decoded.email + ‘_seen’]) {
-showUsernameModal(googleName);
+    // Show username modal only if never seen before
+    if (!usernameMap[decoded.email + '_seen']) {
+      showUsernameModal(googleName);
+    }
+  } catch(e) {
+    console.error('Error processing Google sign-in:', e);
+  }
 }
-} catch(e) {
-console.error(‘Error processing Google sign-in:’, e);
-}
-}
+```
+
 }
 
 // Init
@@ -437,14 +421,12 @@ document.getElementById(‘char-count’).textContent = this.value.length;
 }
 // Initialize Google Sign-In button as soon as library is ready
 if (window.google && window.google.accounts) {
-mobileDebug(‘GSI ready on init’);
 initGoogleSignIn();
 } else {
 // GSI library not ready yet — wait for it
 var gsiInterval = setInterval(function() {
 if (window.google && window.google.accounts) {
 clearInterval(gsiInterval);
-mobileDebug(‘GSI ready via interval’);
 initGoogleSignIn();
 }
 }, 200);
@@ -7287,7 +7269,7 @@ if (!section) return;
 var saved = {};
 try { saved = JSON.parse(localStorage.getItem(CHECKLIST_KEY) || ‘{}’); } catch(e) {}
 
-```
+
 var header = document.createElement('div');
 header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
 var h4 = document.createElement('h4');
@@ -7340,15 +7322,6 @@ CHECKLIST_DATA.forEach(function(group) {
 });
 
 section.appendChild(body);
-```
 
-}
 
-} catch(e) {
-try {
-var _eb = document.createElement(‘div’);
-_eb.style.cssText = ‘position:fixed;top:0;left:0;right:0;background:#900;color:#fff;font-size:12px;padding:10px;z-index:999999;word-break:break-all;’;
-_eb.textContent = ‘JS Error: ’ + e.message + ’ (line ’ + (e.lineNumber||e.line||’?’) + ‘)’;
-document.body.appendChild(_eb);
-} catch(e2) {}
 }

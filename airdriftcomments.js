@@ -1,6 +1,6 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-03 21:33
+// Build: 2026-04-03 21:47
 
 // Load Google Fonts for community rank labels
 (function() {
@@ -339,12 +339,12 @@ var allComments  = [];
         client_id: GOOGLE_CLIENT_ID,
         callback: handleGoogleSignInResponse,
         ux_mode: 'popup',
-        auto_select: false,
-        itp_support: true
+        auto_select: false
       });
       google.accounts.id.prompt(function(notification) {
         googleSignInInProgress = false;
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          // Prompt was dismissed -- fall back to renderButton
           google.accounts.id.renderButton(
             document.getElementById('google-signin-btn'),
             { theme: 'filled_black', size: 'large', text: 'signin_with', shape: 'rectangular', width: 220 }
@@ -354,49 +354,51 @@ var allComments  = [];
     } catch(e) {
       googleSignInInProgress = false;
       console.error('Google Sign-In error:', e);
+      alert('Error signing in. Please try again.');
     }
   }
 
-    function handleGoogleSignInResponse(response) {
-    if (!response.credential) return;
-    try {
-      var base64Url = response.credential.split('.')[1];
-      var base64    = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      var json      = decodeURIComponent(atob(base64).split('').map(function(c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-      var decoded   = JSON.parse(json);
-      loadUsernames();
-      var chosenName = usernameMap[decoded.email] || decoded.name;
-      currentUser = { name: chosenName, email: decoded.email, provider: 'google' };
-      dismissWelcomeModal();
-      sessionStorage.setItem('airdriftCurrentUser', JSON.stringify(currentUser));
-      localStorage.setItem('airdriftCurrentUser', JSON.stringify(currentUser));
-      updateUI();
-      loadRateTimestamps();
-      loadNotifications();
-      checkPendingFlairModals();
-      updateSubscribeBtn();
-      renderComments();
-      showSignedInToast(true);
-      scanForNotifications();
-      scanForMentionNotifications();
-      startNotifPolling();
-      startTypingPoll();
-      var warnCount = localStorage.getItem('airdriftWarn:' + decoded.email);
-      if (warnCount) {
-        localStorage.removeItem('airdriftWarn:' + decoded.email);
-        setTimeout(function() { alert('You have received a warning from the moderator. You now have ' + warnCount + ' warning' + (parseInt(warnCount) > 1 ? 's' : '') + '.'); }, 1000);
+  function handleGoogleSignInResponse(response) {
+    if (response.credential) {
+      try {
+        var base64Url = response.credential.split('.')[1];
+        var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        var jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        var decoded = JSON.parse(jsonPayload);
+        var googleName = decoded.name;
+        loadUsernames();
+        var chosenName = usernameMap[decoded.email] || googleName;
+        currentUser = { name: chosenName, email: decoded.email, provider: 'google' };
+        dismissWelcomeModal();
+        sessionStorage.setItem('airdriftCurrentUser', JSON.stringify(currentUser));
+        localStorage.setItem('airdriftCurrentUser', JSON.stringify(currentUser));
+        updateUI();
+        loadRateTimestamps();
+        showSignedInToast(true);
+        loadNotifications();
+        checkPendingFlairModals();
+        updateSubscribeBtn();
+        renderComments();
+        scanForNotifications();
+        scanForMentionNotifications();
+        startNotifPolling();
+        startTypingPoll();
+        var warnCount = localStorage.getItem('airdriftWarn:' + decoded.email);
+        if (warnCount) {
+          localStorage.removeItem('airdriftWarn:' + decoded.email);
+          setTimeout(function() { alert('You have received a warning from the moderator. You now have ' + warnCount + ' warning' + (parseInt(warnCount) > 1 ? 's' : '') + '.'); }, 1000);
+        }
+        var reinstated = localStorage.getItem('airdriftReinstate:' + decoded.email);
+        if (reinstated) {
+          localStorage.removeItem('airdriftReinstate:' + decoded.email);
+          setTimeout(function() { alert('Your account has been reinstated. Welcome back!'); }, 1000);
+        }
+        if (!usernameMap[decoded.email + '_seen']) showUsernameModal(googleName);
+      } catch(e) {
+        console.error('Error processing Google sign-in:', e);
       }
-      var reinstated = localStorage.getItem('airdriftReinstate:' + decoded.email);
-      if (reinstated) {
-        localStorage.removeItem('airdriftReinstate:' + decoded.email);
-        setTimeout(function() { alert('Your account has been reinstated. Welcome back!'); }, 1000);
-      }
-      if (!usernameMap[decoded.email + '_seen']) showUsernameModal(decoded.name);
-    } catch(e) {
-      console.error('Google sign-in error:', e);
-      alert('Sign-in error: ' + e.message);
     }
   }
 

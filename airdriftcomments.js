@@ -1,6 +1,8 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-03 12:31
+// Build: 2026-04-03 20:14
+
+try {
 
 // Load Google Fonts for community rank labels
 (function() {
@@ -7340,4 +7342,13 @@ CHECKLIST_DATA.forEach(function(group) {
 section.appendChild(body);
 ```
 
+}
+
+} catch(e) {
+try {
+var _eb = document.createElement(‘div’);
+_eb.style.cssText = ‘position:fixed;top:0;left:0;right:0;background:#900;color:#fff;font-size:12px;padding:10px;z-index:999999;word-break:break-all;’;
+_eb.textContent = ‘JS Error: ’ + e.message + ’ (line ’ + (e.lineNumber||e.line||’?’) + ‘)’;
+document.body.appendChild(_eb);
+} catch(e2) {}
 }

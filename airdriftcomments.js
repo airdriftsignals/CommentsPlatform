@@ -1,6 +1,6 @@
 // AirdriftSignals Comment System v15
 // https://airdriftsignals.com
-// Build: 2026-04-03 03:19
+// Build: 2026-04-03 03:26
 
 // Load Google Fonts for community rank labels
 (function() {
@@ -329,47 +329,47 @@ updateUI();
 }
 
 // Google Sign-In
+// Initialize Google Sign-In once GSI library is ready
+// Renders a real Google button so mobile browsers never block it
+function initGoogleSignIn() {
+if (!window.google || !window.google.accounts) return;
+google.accounts.id.initialize({
+client_id: GOOGLE_CLIENT_ID,
+callback: handleGoogleSignInResponse,
+auto_select: false,
+cancel_on_tap_outside: true
+});
+// Render the button into the sign-in form button slot
+var btnEl = document.getElementById(‘google-signin-btn’);
+if (btnEl) {
+google.accounts.id.renderButton(btnEl,
+{ theme: ‘filled_black’, size: ‘large’, text: ‘signin_with’, shape: ‘rectangular’, width: 240 }
+);
+}
+}
+
+// Called by all sign-in buttons in the UI
+// On mobile: shows the pre-rendered Google button area
+// On desktop: triggers One Tap prompt as well
 function signInWithGoogle() {
-if (googleSignInInProgress) return;
 if (!window.google || !window.google.accounts) {
 alert(‘Google Sign-In is still loading. Please try again in a moment.’);
 return;
 }
-googleSignInInProgress = true;
-try {
-google.accounts.id.cancel();
-google.accounts.id.initialize({
-client_id: GOOGLE_CLIENT_ID,
-callback: handleGoogleSignInResponse,
-auto_select: false
-});
-// Use renderButton for reliable mobile support — popup ux_mode is blocked by mobile browsers
-// Always render into the sign-in button so the tap is a direct gesture on the Google button
+// Make sure button is rendered
+initGoogleSignIn();
+// Show the sign-in form if it is hidden
+var form = document.getElementById(‘comment-form-guest’);
+if (form) form.style.display = ‘block’;
+// Scroll to the sign-in button so user can tap it
 var btnEl = document.getElementById(‘google-signin-btn’);
 if (btnEl) {
-google.accounts.id.renderButton(btnEl,
-{ theme: ‘filled_black’, size: ‘large’, text: ‘signin_with’, shape: ‘rectangular’, width: 220 }
-);
-// Simulate a click on the rendered Google button
-var gBtn = btnEl.querySelector(’[role=“button”], button, div[tabindex]’);
-if (gBtn) gBtn.click();
-else {
-// Fallback: prompt with redirect for mobile
-google.accounts.id.prompt(function(notification) {
-googleSignInInProgress = false;
-});
+btnEl.scrollIntoView({ behavior: ‘smooth’, block: ‘center’ });
 }
-} else {
-google.accounts.id.prompt(function(notification) {
-googleSignInInProgress = false;
-});
-}
-googleSignInInProgress = false;
-} catch(e) {
-googleSignInInProgress = false;
-console.error(‘Google Sign-In error:’, e);
-alert(‘Error signing in. Please try again.’);
-}
+// Also try One Tap for desktop (silently ignored on mobile)
+try {
+google.accounts.id.prompt(function(notification) {});
+} catch(e) {}
 }
 
 function handleGoogleSignInResponse(response) {
@@ -419,6 +419,18 @@ if (input) {
 input.addEventListener(‘input’, function() {
 document.getElementById(‘char-count’).textContent = this.value.length;
 });
+}
+// Initialize Google Sign-In button as soon as library is ready
+if (window.google && window.google.accounts) {
+initGoogleSignIn();
+} else {
+// GSI library not ready yet — wait for it
+var gsiInterval = setInterval(function() {
+if (window.google && window.google.accounts) {
+clearInterval(gsiInterval);
+initGoogleSignIn();
+}
+}, 200);
 }
 loadCurrentUser();
 loadComments();
